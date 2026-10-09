@@ -1,0 +1,1001 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#12150f" />
+  <title>Генодрайв — эволюция машин</title>
+  <style>
+    :root {
+      --ink: #171a14;
+      --muted: #707668;
+      --paper: #f3f0e7;
+      --panel: rgba(250, 248, 241, .93);
+      --line: rgba(31, 36, 27, .13);
+      --acid: #d7f23d;
+      --acid-dark: #80920f;
+      --orange: #ff7548;
+      --dark: #171b14;
+      --shadow: 0 20px 55px rgba(31, 38, 22, .16);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      color: var(--ink);
+      background: #d9dfce;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input, select { font: inherit; }
+    canvas { display: block; width: 100%; height: 100%; }
+
+    .app { position: relative; width: 100%; height: 100%; min-height: 600px; }
+    .brand {
+      position: absolute; z-index: 5; top: 24px; left: 28px;
+      display: flex; align-items: center; gap: 11px; color: white;
+      text-shadow: 0 2px 12px rgba(0,0,0,.25); user-select: none;
+    }
+    .brand-mark {
+      width: 34px; height: 34px; border: 2px solid rgba(255,255,255,.7); border-radius: 50%;
+      display: grid; place-items: center; color: var(--acid); font-size: 19px; transform: rotate(-12deg);
+      background: rgba(19,24,15,.3); backdrop-filter: blur(8px);
+    }
+    .brand strong { display: block; font-size: 14px; letter-spacing: .15em; text-transform: uppercase; }
+    .brand span { display: block; margin-top: 1px; font: 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; opacity: .7; letter-spacing: .08em; }
+
+    .top-stats {
+      position: absolute; z-index: 4; top: 20px; right: 24px;
+      display: grid; grid-template-columns: repeat(4, minmax(90px, 1fr));
+      border: 1px solid rgba(255,255,255,.24); border-radius: 15px; overflow: hidden;
+      color: white; background: rgba(18, 22, 15, .46); backdrop-filter: blur(13px);
+      box-shadow: 0 10px 35px rgba(0,0,0,.12);
+    }
+    .stat { padding: 11px 16px 10px; min-width: 105px; border-left: 1px solid rgba(255,255,255,.15); }
+    .stat:first-child { border-left: 0; }
+    .stat-label { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .12em; opacity: .61; }
+    .stat-value { display: block; margin-top: 2px; font: 600 18px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .stat-value em { color: var(--acid); font-style: normal; }
+
+    .terrain-label {
+      position: absolute; z-index: 3; left: 30px; top: 92px; color: rgba(255,255,255,.74);
+      font: 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .11em; text-transform: uppercase;
+    }
+
+    .panel {
+      position: absolute; z-index: 6; left: 24px; bottom: 22px; width: min(360px, calc(100% - 48px));
+      background: var(--panel); border: 1px solid rgba(255,255,255,.55); border-radius: 20px;
+      box-shadow: var(--shadow); backdrop-filter: blur(17px); overflow: hidden;
+    }
+    .panel-head { padding: 18px 20px 15px; display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid var(--line); }
+    .eyebrow { font: 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--acid-dark); text-transform: uppercase; letter-spacing: .13em; }
+    h1 { margin: 3px 0 0; font-size: 21px; line-height: 1.1; letter-spacing: -.035em; }
+    .status-pill { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); padding-top: 3px; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--acid-dark); box-shadow: 0 0 0 4px rgba(128,146,15,.12); }
+    .status-dot.paused { background: #9a9b94; box-shadow: 0 0 0 4px rgba(100,100,95,.12); }
+
+    .controls { padding: 15px 20px 17px; }
+    .button-row { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px; }
+    .btn {
+      border: 0; border-radius: 11px; min-height: 40px; padding: 0 14px; cursor: pointer;
+      background: var(--dark); color: white; font-weight: 650; font-size: 12px;
+      transition: transform .15s ease, background .15s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: .42; cursor: default; transform: none; }
+    .btn.primary { background: var(--acid); color: #1d210e; }
+    .btn.icon { width: 42px; padding: 0; font-size: 16px; background: #e8e7df; color: var(--ink); }
+    .sliders { margin-top: 15px; display: grid; gap: 12px; }
+    .control-line { display: grid; grid-template-columns: 90px 1fr 43px; align-items: center; gap: 10px; }
+    .control-line label { font-size: 11px; color: var(--muted); }
+    .control-line output { text-align: right; font: 600 11px/1 ui-monospace, monospace; }
+    input[type="range"] { width: 100%; accent-color: var(--acid-dark); }
+    select { width: 100%; border: 1px solid var(--line); background: white; border-radius: 8px; padding: 5px 7px; font-size: 11px; color: var(--ink); }
+
+    .history {
+      position: absolute; z-index: 5; right: 24px; bottom: 22px; width: 260px;
+      color: white; background: rgba(20,24,17,.71); border: 1px solid rgba(255,255,255,.14);
+      border-radius: 17px; padding: 14px 16px 12px; backdrop-filter: blur(12px);
+    }
+    .history-head { display: flex; justify-content: space-between; align-items: baseline; }
+    .history-head strong { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .history-head span { font: 10px ui-monospace, monospace; color: var(--acid); }
+    #chart { width: 100%; height: 52px; margin-top: 7px; overflow: visible; }
+    .history-foot { display: flex; justify-content: space-between; color: rgba(255,255,255,.45); font: 9px ui-monospace, monospace; }
+
+    .leader-card {
+      position: absolute; z-index: 4; right: 24px; bottom: 120px; width: 300px; padding: 12px 16px;
+      color: white; background: rgba(20,24,17,.48); border: 1px solid rgba(255,255,255,.12); border-radius: 14px; backdrop-filter: blur(9px);
+    }
+    .leader-card small { color: rgba(255,255,255,.52); text-transform: uppercase; letter-spacing: .1em; font-size: 9px; }
+    .genes { margin-top: 7px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+    .gene { height: 4px; background: rgba(255,255,255,.14); border-radius: 4px; overflow: hidden; }
+    .gene i { display: block; height: 100%; border-radius: inherit; background: var(--acid); }
+    .drive-line { margin-top: 9px; display: flex; align-items: center; justify-content: space-between; }
+    .drive-badge { padding: 4px 7px; border-radius: 6px; color: #20250f; background: var(--acid); font: 700 9px ui-monospace, monospace; text-transform: uppercase; }
+    .drive-line span:last-child { color: rgba(255,255,255,.48); font: 9px ui-monospace, monospace; }
+    .genome-grid { margin-top: 9px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px 6px; }
+    .genome-cell { min-width: 0; }
+    .genome-cell span { display: block; color: rgba(255,255,255,.4); font-size: 8px; text-transform: uppercase; letter-spacing: .05em; }
+    .genome-cell b { display: block; margin-top: 1px; color: rgba(255,255,255,.88); font: 600 10px ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mini-board { margin-top: 11px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 8px; display: grid; gap: 4px; }
+    .mini-row { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 7px; font: 10px/1.4 ui-monospace, monospace; }
+    .mini-row .rank { color: rgba(255,255,255,.38); }
+    .mini-row .name { color: rgba(255,255,255,.74); }
+    .mini-row .result { color: var(--acid); }
+    .mini-empty { color: rgba(255,255,255,.35); font-size: 10px; padding: 4px 0; }
+
+    .phase-overlay {
+      position: absolute; z-index: 20; inset: 0; display: grid; place-items: center; padding: 24px;
+      background: rgba(14,18,12,.68); backdrop-filter: blur(10px); opacity: 0; visibility: hidden;
+      transition: opacity .28s ease, visibility .28s ease;
+    }
+    .phase-overlay.open { opacity: 1; visibility: visible; }
+    .phase-card {
+      width: min(760px, 100%); max-height: calc(100vh - 48px); overflow: auto; border-radius: 24px;
+      background: #f4f1e8; color: var(--ink); box-shadow: 0 34px 90px rgba(0,0,0,.33); border: 1px solid rgba(255,255,255,.65);
+    }
+    .phase-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 25px 28px 20px; border-bottom: 1px solid var(--line); }
+    .phase-kicker { color: var(--acid-dark); font: 10px/1.2 ui-monospace, monospace; letter-spacing: .13em; text-transform: uppercase; }
+    .phase-top h2 { margin: 5px 0 0; font-size: 28px; letter-spacing: -.045em; }
+    .phase-summary { text-align: right; }
+    .phase-summary strong { display: block; font: 700 25px/1 ui-monospace, monospace; }
+    .phase-summary span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; }
+    .phase-body { padding: 21px 28px 26px; }
+    .results-table { width: 100%; border-collapse: collapse; }
+    .results-table th { color: var(--muted); font: 9px/1.2 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .1em; text-align: left; padding: 0 10px 8px; }
+    .results-table th:last-child, .results-table td:last-child { text-align: right; }
+    .results-table td { padding: 10px; border-top: 1px solid var(--line); font-size: 12px; }
+    .results-table tr:first-child td { background: rgba(215,242,61,.16); }
+    .car-chip { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
+    .car-chip i { width: 10px; height: 10px; border-radius: 3px; background: var(--chip); }
+    .fitness { font: 700 13px ui-monospace, monospace; }
+    .phase-actions { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; gap: 18px; }
+    .phase-note { max-width: 440px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .phase-actions .btn { min-width: 190px; }
+
+    .breeding-layout { display: grid; grid-template-columns: 230px 1fr; gap: 22px; }
+    .recipe { padding: 16px; border-radius: 16px; background: #1b2018; color: white; }
+    .recipe h3 { margin: 0 0 13px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .recipe-step { display: grid; grid-template-columns: 25px 1fr; gap: 8px; padding: 9px 0; border-top: 1px solid rgba(255,255,255,.1); }
+    .recipe-step b { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 50%; background: var(--acid); color: #20250f; font: 700 10px ui-monospace, monospace; }
+    .recipe-step strong { display: block; font-size: 11px; }
+    .recipe-step span { display: block; margin-top: 2px; color: rgba(255,255,255,.48); font-size: 9px; line-height: 1.35; }
+    .cross-stage { min-width: 0; }
+    .cross-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .cross-head strong { font-size: 12px; }
+    .cross-head span { color: var(--muted); font: 10px ui-monospace, monospace; }
+    .parent-flow { min-height: 88px; display: grid; grid-template-columns: 1fr 28px 1fr 28px 1fr; align-items: center; gap: 6px; padding: 10px; background: white; border: 1px solid var(--line); border-radius: 14px; }
+    .dna-card { min-width: 0; padding: 9px; border-radius: 10px; background: #ecebe4; }
+    .dna-card.child { background: rgba(215,242,61,.34); }
+    .dna-card small { display: block; color: var(--muted); font: 8px ui-monospace, monospace; text-transform: uppercase; }
+    .dna-card strong { display: block; margin-top: 3px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dna-bars { display: flex; gap: 2px; margin-top: 7px; align-items: flex-end; height: 14px; }
+    .dna-bars i { flex: 1; min-height: 2px; background: var(--acid-dark); border-radius: 2px; }
+    .flow-symbol { text-align: center; color: var(--acid-dark); font: 700 18px ui-monospace, monospace; }
+    .offspring-grid { margin-top: 11px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; max-height: 150px; overflow: auto; }
+    .offspring { opacity: 0; transform: translateY(5px); display: grid; grid-template-columns: 28px 1fr auto; gap: 7px; align-items: center; padding: 7px 9px; border-radius: 9px; background: white; border: 1px solid var(--line); transition: .22s ease; }
+    .offspring.show { opacity: 1; transform: none; }
+    .offspring b { font: 700 10px ui-monospace, monospace; }
+    .offspring span { color: var(--muted); font: 9px ui-monospace, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .offspring em { color: var(--orange); font: normal 8px ui-monospace, monospace; }
+    .breeding-progress { height: 4px; margin-top: 11px; border-radius: 4px; background: #deddd5; overflow: hidden; }
+    .breeding-progress i { display: block; height: 100%; width: 0; background: var(--acid-dark); transition: width .2s ease; }
+    .archive-tools { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+    .archive-tools p { margin: 0; color: var(--muted); font-size: 11px; }
+    .segments { display: flex; gap: 3px; padding: 3px; border-radius: 9px; background: #deddd5; }
+    .segment { border: 0; padding: 5px 10px; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; font-size: 10px; }
+    .segment.active { background: white; color: var(--ink); box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+    .champ-table { width: 100%; border-collapse: collapse; }
+    .champ-table th { padding: 0 8px 8px; text-align: left; color: var(--muted); font: 9px ui-monospace, monospace; text-transform: uppercase; letter-spacing: .09em; }
+    .champ-table td { padding: 9px 8px; border-top: 1px solid var(--line); vertical-align: middle; font-size: 11px; }
+    .champ-table td:last-child, .champ-table th:last-child { text-align: right; }
+    .champion-thumb { display: block; width: 112px; height: 48px; border-radius: 9px; background: #d8ddcd; }
+    .champ-achievement strong { display: block; font-size: 11px; }
+    .champ-achievement span { display: block; margin-top: 2px; color: var(--muted); font-size: 9px; }
+    .empty-archive { padding: 30px 12px !important; text-align: center !important; color: var(--muted); }
+    .champ-dock {
+      position: absolute; z-index: 7; left: 0; top: 132px; width: 224px; color: white;
+      background: rgba(20,24,17,.76); border: 1px solid rgba(255,255,255,.14); border-left: 0;
+      border-radius: 0 15px 15px 0; padding: 12px 12px 10px; backdrop-filter: blur(12px); box-shadow: 0 12px 35px rgba(0,0,0,.16);
+    }
+    .champ-dock-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .champ-dock-head strong { font-size: 10px; text-transform: uppercase; letter-spacing: .09em; }
+    .dock-expand { border: 0; background: rgba(255,255,255,.1); color: var(--acid); border-radius: 7px; padding: 5px 7px; cursor: pointer; font-size: 9px; }
+    .dock-list { margin-top: 8px; display: grid; gap: 5px; }
+    .dock-row { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 7px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,.09); }
+    .dock-row canvas { width: 34px; height: 22px; border-radius: 5px; background: #d8ddcd; }
+    .dock-row b { display: block; font: 700 9px ui-monospace, monospace; }
+    .dock-row span { display: block; color: rgba(255,255,255,.42); font: 8px ui-monospace, monospace; }
+    .dock-row em { color: var(--acid); font: normal 700 9px ui-monospace, monospace; }
+    .dock-empty { padding: 7px 0 3px; color: rgba(255,255,255,.4); font-size: 9px; }
+    .save-strip { display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;font-size:10px;color:var(--muted); }
+    .save-button { border:1px solid var(--line);border-radius:7px;background:white;padding:5px 8px;cursor:pointer;font-size:10px; }
+    .resume-summary { color:var(--muted);font-size:13px;line-height:1.7;margin:0 0 20px; }
+
+    .toast {
+      position: absolute; z-index: 8; left: 50%; top: 106px; transform: translate(-50%, -14px);
+      padding: 9px 14px; border-radius: 999px; color: white; background: rgba(18,22,15,.77);
+      font-size: 11px; opacity: 0; pointer-events: none; transition: .35s ease; backdrop-filter: blur(8px);
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .outcome-banner {
+      position: absolute; z-index: 12; left: 50%; top: 145px; width: min(430px, calc(100% - 32px));
+      transform: translate(-50%, -10px); padding: 13px 16px; display: grid; grid-template-columns: 35px 1fr auto;
+      align-items: center; gap: 11px; color: white; background: rgba(25,29,21,.9); border: 1px solid rgba(255,255,255,.15);
+      border-radius: 14px; box-shadow: 0 18px 40px rgba(0,0,0,.22); backdrop-filter: blur(12px);
+      opacity: 0; visibility: hidden; transition: .25s ease;
+    }
+    .outcome-banner.show { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+    .outcome-icon { width: 35px; height: 35px; display: grid; place-items: center; border-radius: 10px; background: var(--orange); font-size: 17px; }
+    .outcome-banner.success .outcome-icon { background: var(--acid); color: #1d210e; }
+    .outcome-banner.neutral .outcome-icon { background: #8d9386; }
+    .outcome-copy strong { display: block; font-size: 12px; }
+    .outcome-copy span { display: block; margin-top: 2px; color: rgba(255,255,255,.57); font-size: 10px; }
+    .outcome-distance { color: var(--acid); font: 700 13px ui-monospace, monospace; }
+
+    @media (max-width: 760px) {
+      .app { min-height: 560px; }
+      .brand { top: 16px; left: 16px; }
+      .brand span, .terrain-label, .leader-card { display: none; }
+      .top-stats { top: 66px; left: 16px; right: 16px; grid-template-columns: repeat(4, 1fr); }
+      .stat { min-width: 0; padding: 9px 8px; }
+      .stat-value { font-size: 14px; }
+      .panel { left: 12px; bottom: 12px; width: calc(100% - 24px); }
+      .history { display: none; }
+      .controls { padding-bottom: 14px; }
+      .phase-overlay { padding: 10px; }
+      .phase-card { max-height: calc(100vh - 20px); border-radius: 18px; }
+      .phase-top, .phase-body { padding-left: 18px; padding-right: 18px; }
+      .breeding-layout { grid-template-columns: 1fr; }
+      .recipe { display: none; }
+      .phase-actions { align-items: stretch; flex-direction: column; }
+      .phase-actions .btn { width: 100%; }
+      .champ-table th:nth-child(3), .champ-table td:nth-child(3) { display: none; }
+      .champion-thumb { width: 86px; }
+      .champ-dock { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" aria-label="Симуляция генетического алгоритма">
+    <canvas id="world" aria-label="Машинки преодолевают каменистую трассу"></canvas>
+
+    <div class="brand" aria-label="Генодрайв">
+      <div class="brand-mark">⌁</div>
+      <div><strong>Генодрайв</strong><span>EVOLUTION LAB / 01</span></div>
+    </div>
+    <div class="terrain-label">Полигон «Базальтовый хребет» · фиксированная трасса</div>
+
+    <section class="top-stats" aria-label="Показатели симуляции">
+      <div class="stat"><span class="stat-label">Поколение</span><span class="stat-value" id="generation">01</span></div>
+      <div class="stat"><span class="stat-label">Дистанция</span><span class="stat-value"><em id="distance">0.0</em> м</span></div>
+      <div class="stat"><span class="stat-label">Заезд</span><span class="stat-value" id="alive">1 / 12</span></div>
+      <div class="stat"><span class="stat-label">Осталось</span><span class="stat-value" id="timer">120.0 с</span></div>
+    </section>
+
+    <aside class="panel" aria-label="Управление эволюцией">
+      <div class="panel-head">
+        <div><div class="eyebrow">Лаборатория эволюции</div><h1>Полевой прогон</h1></div>
+        <div class="status-pill"><i class="status-dot" id="statusDot"></i><span id="statusText">идёт отбор</span></div>
+      </div>
+      <div class="controls">
+        <div class="button-row">
+          <button class="btn primary" id="toggle">Пауза</button>
+          <button class="btn" id="next">Завершить заезд</button>
+          <button class="btn icon" id="champions" title="Архив чемпионов" aria-label="Архив чемпионов">♛</button>
+          <button class="btn icon" id="reset" title="Начать заново" aria-label="Начать заново">↻</button>
+        </div>
+        <div class="sliders">
+          <div class="control-line">
+            <label for="population">Популяция</label>
+            <input id="population" type="range" min="6" max="24" value="12" step="1" />
+            <output id="populationOut">12</output>
+          </div>
+          <div class="control-line">
+            <label for="mutation">Мутация</label>
+            <input id="mutation" type="range" min="2" max="35" value="13" step="1" />
+            <output id="mutationOut">13%</output>
+          </div>
+          <div class="control-line">
+            <label for="speed">Скорость</label>
+            <select id="speed"><option value="1">1× — наблюдать</option><option value="2">2× — быстрее</option><option value="4">4× — турбо</option><option value="8" selected>8× — быстрая селекция</option><option value="16">16× — максимум</option></select>
+            <output>SIM</output>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="leader-card" aria-label="Гены лидера">
+      <small>Текущая машина · <span id="leaderId">#01</span></small>
+      <div class="genes" title="Колёса, база, тяга, подвеска">
+        <span class="gene"><i id="g0"></i></span><span class="gene"><i id="g1"></i></span>
+        <span class="gene"><i id="g2"></i></span><span class="gene"><i id="g3"></i></span>
+      </div>
+      <div class="drive-line"><strong class="drive-badge" id="driveType">колёса</strong><span>наследуемый геном</span></div>
+      <div class="genome-grid">
+        <div class="genome-cell"><span>размер</span><b id="geneWheel">—</b></div>
+        <div class="genome-cell"><span>база</span><b id="geneBase">—</b></div>
+        <div class="genome-cell"><span>тяга</span><b id="geneMotor">—</b></div>
+        <div class="genome-cell"><span>пружина</span><b id="geneSpring">—</b></div>
+        <div class="genome-cell"><span>ход подв.</span><b id="geneTravel">—</b></div>
+        <div class="genome-cell"><span>клиренс</span><b id="geneHeight">—</b></div>
+        <div class="genome-cell"><span>сцепление</span><b id="geneGrip">—</b></div>
+        <div class="genome-cell"><span>рама</span><b id="geneFrame">—</b></div>
+        <div class="genome-cell"><span>масса</span><b id="geneMass">—</b></div>
+        <div class="genome-cell"><span>центр ↓</span><b id="geneComY">—</b></div>
+        <div class="genome-cell"><span>баланс ↔</span><b id="geneComX">—</b></div>
+        <div class="genome-cell"><span>анти‑ролл</span><b id="geneControl">—</b></div>
+      </div>
+      <div class="mini-board" id="miniBoard"><div class="mini-empty">Рейтинг появится после первого заезда</div></div>
+    </section>
+    <aside class="champ-dock" aria-label="Краткий список чемпионов">
+      <div class="champ-dock-head"><strong>Чемпионы</strong><button class="dock-expand" id="expandChampions">Развернуть ↗</button></div>
+      <div class="dock-list" id="champDockRows"><div class="dock-empty">Завершите первое поколение</div></div>
+    </aside>
+
+    <section class="history" aria-label="История рекордов">
+      <div class="history-head"><strong>Прогресс поколений</strong><span id="record">рекорд 0.0 м</span></div>
+      <svg id="chart" viewBox="0 0 228 52" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 48H228" stroke="rgba(255,255,255,.12)" fill="none" />
+        <path id="area" fill="rgba(215,242,61,.12)" d="" />
+        <path id="line" stroke="#d7f23d" stroke-width="2" fill="none" vector-effect="non-scaling-stroke" d="" />
+      </svg>
+      <div class="history-foot"><span>СТАРТ</span><span>СЕЙЧАС</span></div>
+    </section>
+    <section class="phase-overlay" id="resultsOverlay" aria-label="Итоги поколения" aria-hidden="true">
+      <div class="phase-card">
+        <div class="phase-top">
+          <div><div class="phase-kicker">Все машины финишировали</div><h2>Итоги поколения <span id="resultsGeneration">01</span></h2></div>
+          <div class="phase-summary"><strong id="resultsBest">0.0 м</strong><span>лучший результат</span></div>
+        </div>
+        <div class="phase-body">
+          <table class="results-table">
+            <thead><tr><th>Место</th><th>Машина</th><th>Ходовая</th><th>Причина остановки</th><th>Результат</th></tr></thead>
+            <tbody id="resultsRows"></tbody>
+          </table>
+          <div class="phase-actions">
+            <p class="phase-note">Теперь алгоритм сохранит элиту, выберет родителей турнирным отбором, скрестит их параметры и добавит случайные мутации.</p>
+            <button class="btn primary" id="showBreeding">Показать селекцию →</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="phase-overlay" id="breedingOverlay" aria-label="Создание следующего поколения" aria-hidden="true">
+      <div class="phase-card">
+        <div class="phase-top">
+          <div><div class="phase-kicker">Генетический алгоритм</div><h2>Создаём поколение <span id="nextGeneration">02</span></h2></div>
+          <div class="phase-summary"><strong id="offspringCount">0 / 12</strong><span>новых геномов</span></div>
+        </div>
+        <div class="phase-body breeding-layout">
+          <div class="recipe">
+            <h3>Рецепт эволюции</h3>
+            <div class="recipe-step"><b>1</b><div><strong>Элита</strong><span>Два лучших генома переходят без изменений.</span></div></div>
+            <div class="recipe-step"><b>2</b><div><strong>Отбор</strong><span>Родители выбираются среди сильнейших.</span></div></div>
+            <div class="recipe-step"><b>3</b><div><strong>Скрещивание</strong><span>Параметры родителей смешиваются.</span></div></div>
+            <div class="recipe-step"><b>4</b><div><strong>Мутация</strong><span>Часть генов случайно меняется.</span></div></div>
+          </div>
+          <div class="cross-stage">
+            <div class="cross-head"><strong id="crossTitle">Сохраняем элиту</strong><span id="crossMeta">без мутаций</span></div>
+            <div class="parent-flow" id="parentFlow"></div>
+            <div class="breeding-progress"><i id="breedingProgress"></i></div>
+            <div class="offspring-grid" id="offspringGrid"></div>
+            <div class="phase-actions">
+              <p class="phase-note" id="breedingNote">Следите, какие машины становятся родителями и сколько генов меняет мутация.</p>
+              <button class="btn primary" id="startNext" disabled>Начать поколение</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="phase-overlay" id="championsOverlay" aria-label="Архив чемпионов" aria-hidden="true">
+      <div class="phase-card">
+        <div class="phase-top">
+          <div><div class="phase-kicker">Зал славы</div><h2>Чемпионы поколений</h2></div>
+          <button class="btn icon" id="closeChampions" aria-label="Закрыть архив">×</button>
+        </div>
+        <div class="phase-body">
+          <div class="archive-tools">
+            <p>Лучшая машина каждого завершённого поколения</p>
+            <div class="segments" aria-label="Количество поколений">
+              <button class="segment active" data-limit="5">5 поколений</button>
+              <button class="segment" data-limit="10">10 поколений</button>
+            </div>
+          </div>
+          <table class="champ-table">
+            <thead><tr><th>Поколение</th><th>Чемпион</th><th>Конструкция</th><th>Достижение</th><th>Результат</th></tr></thead>
+            <tbody id="championsRows"><tr><td colspan="5" class="empty-archive">Завершите первое поколение — здесь появится чемпион.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+    <div class="outcome-banner" id="outcomeBanner" role="status">
+      <div class="outcome-icon" id="outcomeIcon">!</div>
+      <div class="outcome-copy"><strong id="outcomeTitle">Заезд завершён</strong><span id="outcomeDetail">Причина</span></div>
+      <div class="outcome-distance" id="outcomeDistance">0.0 м</div>
+    </div>
+    <section class="phase-overlay" id="resumeOverlay" aria-label="Продолжить эксперимент" aria-hidden="true">
+      <div class="phase-card" style="max-width:520px">
+        <div class="phase-top"><div><div class="phase-kicker">Эксперимент сохранён</div><h2>Продолжим заезд?</h2></div></div>
+        <div class="phase-body"><p class="resume-summary" id="resumeSummary"></p>
+          <div class="button-row" style="grid-template-columns:1fr 1fr"><button class="btn primary" id="resumeSaved">Продолжить</button><button class="btn" id="startFresh">Начать заново</button></div>
+        </div>
+      </div>
+    </section>
+    <div class="toast" id="toast" role="status"></div>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+      const canvas = document.getElementById('world');
+      const ctx = canvas.getContext('2d');
+      const $ = id => document.getElementById(id);
+      const ui = {
+        generation: $('generation'), distance: $('distance'), alive: $('alive'), timer: $('timer'),
+        toggle: $('toggle'), next: $('next'), reset: $('reset'), population: $('population'),
+        populationOut: $('populationOut'), mutation: $('mutation'), mutationOut: $('mutationOut'),
+        speed: $('speed'), statusText: $('statusText'), statusDot: $('statusDot'), leaderId: $('leaderId'),
+        record: $('record'), line: $('line'), area: $('area'), toast: $('toast'), miniBoard: $('miniBoard'),
+        resultsOverlay: $('resultsOverlay'), resultsGeneration: $('resultsGeneration'), resultsBest: $('resultsBest'),
+        resultsRows: $('resultsRows'), showBreeding: $('showBreeding'), breedingOverlay: $('breedingOverlay'),
+        nextGeneration: $('nextGeneration'), offspringCount: $('offspringCount'), crossTitle: $('crossTitle'),
+        crossMeta: $('crossMeta'), parentFlow: $('parentFlow'), offspringGrid: $('offspringGrid'),
+        breedingProgress: $('breedingProgress'), breedingNote: $('breedingNote'), startNext: $('startNext'),
+        driveType: $('driveType'), geneWheel: $('geneWheel'), geneBase: $('geneBase'), geneMotor: $('geneMotor'),
+        geneSpring: $('geneSpring'), geneTravel: $('geneTravel'), geneHeight: $('geneHeight'), geneGrip: $('geneGrip'),
+        geneFrame: $('geneFrame'), geneMass: $('geneMass'), outcomeBanner: $('outcomeBanner'), outcomeIcon: $('outcomeIcon'),
+        outcomeTitle: $('outcomeTitle'), outcomeDetail: $('outcomeDetail'), outcomeDistance: $('outcomeDistance'),
+        geneComY: $('geneComY'), geneComX: $('geneComX'), geneControl: $('geneControl'), champions: $('champions'),
+        championsOverlay: $('championsOverlay'), closeChampions: $('closeChampions'), championsRows: $('championsRows'),
+        expandChampions: $('expandChampions'), champDockRows: $('champDockRows'),
+        genes: [$('g0'), $('g1'), $('g2'), $('g3')]
+      };
+
+      const WORLD_END = 4300, START_X = 115, RUN_TIME = 120, TRACE_STEP = .05, TERRAIN_STEP = 16;
+      const palette = ['#d7f23d', '#ff7548', '#ffd166', '#72d6c9', '#b5a7ff', '#f18fb3', '#8bc6ff'];
+      let dpr = 1, W = 0, H = 0, groundBase = 0, cameraX = 0;
+      let generation = 1, elapsed = 0, paused = false, last = performance.now(), phase = 'racing';
+      let cars = [], history = [], populationSize = +ui.population.value, mutationRate = +ui.mutation.value / 100;
+      let terrain = [], rocks = [], record = 0, toastTimer = 0, currentIndex = 0, phaseTimer = 0;
+      const courseZones = [
+        {x:430,name:'Каменное поле'}, {x:1080,name:'Крутой гребень'}, {x:1650,name:'Ступени'},
+        {x:2360,name:'Карьер'}, {x:2890,name:'Волны'}, {x:3570,name:'Финальный хребет'}
+      ];
+      let runTrace = [], nextTraceAt = 0, raceGhost = null, carryGhost = null, generationGhost = null;
+      let generationGhostGenome = null, generationGhostId = null, breedingPlan = [], breedIndex = 0, breedClock = 0;
+      let champions = [], archiveLimit = 5, phaseBeforeArchive = 'racing';
+      const SAVE_KEY='genodrive:experiment:v1';
+      let savedExperiment=null,saveClock=0,awaitingResume=false;
+
+      class RNG {
+        constructor(seed) { this.seed = seed >>> 0; }
+        next() { this.seed = (this.seed + 0x6D2B79F5) >>> 0; let t = this.seed; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+        between(a,b) { return a + (b-a) * this.next(); }
+      }
+      const rng = new RNG(870221);
+      const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
+      const lerp = (a,b,t) => a + (b-a)*t;
+
+      function makeTerrain() {
+        terrain = [];
+        const step = TERRAIN_STEP;
+        const majorRocks=[{x:565,size:14},{x:700,size:18},{x:845,size:13},{x:965,size:16},{x:3220,size:20},{x:3380,size:22},{x:3860,size:19}];
+        for (let x = -300; x <= WORLD_END + 500; x += step) {
+          let y;
+          if (x < 330) y = 0;
+          else {
+            const ramp = clamp((x-330)/180,0,1);
+            y=(Math.sin(x*.011)*12+Math.sin(x*.0034)*20)*ramp;
+            if(x>=430&&x<1030)y+=Math.sin((x-430)*.038)*9+Math.sin((x-430)*.071)*4;
+            if(x>=1080&&x<1580)y-=Math.sin((x-1080)/500*Math.PI)*142;
+            if(x>=1650&&x<2210){const p=(x-1650)/560;const level=Math.floor((p<.5?p:1-p)*10);y-=level*20;}
+            if(x>=2360&&x<2800)y+=Math.sin((x-2360)/440*Math.PI)*155;
+            if(x>=2890&&x<3500){const q=x-2890;y+=Math.sin(q*.043)*35+Math.sin(q*.019)*16;}
+            if(x>=3570&&x<4220){const q=(x-3570)/650;y-=Math.sin(q*Math.PI)*128;y+=Math.sin(q*Math.PI*7)*22;}
+            majorRocks.forEach(r=>{const dx=x-r.x,span=r.size*1.55;if(Math.abs(dx)<span)y-=Math.sqrt(Math.max(0,1-(dx*dx)/(span*span)))*r.size;});
+          }
+          terrain.push({x, y});
+        }
+        rocks = majorRocks.map(r=>({...r,tilt:0,major:true}));
+        const rr = new RNG(99417);
+        for (let x=360; x<WORLD_END; x += rr.between(110, 205)) {
+          if(!majorRocks.some(r=>Math.abs(r.x-x)<50))rocks.push({x, size:rr.between(4,10),tilt:rr.between(-.6,.6),major:false});
+        }
+      }
+
+      function terrainValue(x) {
+        const step = TERRAIN_STEP, idx = clamp(Math.floor((x + 300) / step), 0, terrain.length-2);
+        const a = terrain[idx], b = terrain[idx+1], t = clamp((x-a.x)/(b.x-a.x),0,1);
+        const smooth = t*t*(3-2*t);
+        return lerp(a.y,b.y,smooth);
+      }
+      function terrainSlope(x) { return (terrainValue(x+3)-terrainValue(x-3))/6; }
+      function groundY(x) { return groundBase + terrainValue(x); }
+
+      function randomGenome() {
+        return {
+          wheel: rng.between(14,23), base: rng.between(48,76), motor: rng.between(28,52),
+          spring: rng.between(48,80), damp: rng.between(7,14), travel: rng.between(10,24), height: rng.between(16,26),
+          grip: rng.between(.68,1.15), frame: rng.between(.78,1.35), mass: rng.between(.82,1.35),
+          comY: rng.between(-5,7), comX: rng.between(-9,9), control: rng.between(.05,1.05), drive: rng.next(),
+          hue: rng.next(), shape: rng.next(), cabin: rng.next(), nose: rng.next(), style:rng.next(),
+          lights:rng.next(), lightLayout:rng.next(), lightShape:rng.next(), horns:rng.next(), hornSize:rng.next(),
+          pattern:rng.next(), spoiler:rng.next(), spoilerStyle:rng.next()
+        };
+      }
+      const bounds = { wheel:[12,27], base:[42,84], motor:[22,62], spring:[38,92], damp:[5,18], travel:[8,28], height:[13,30], grip:[.5,1.35], frame:[.65,1.55], mass:[.7,1.7], comY:[-8,10], comX:[-14,14], control:[0,1.3], drive:[0,1], hue:[0,1], shape:[0,1], cabin:[0,1], nose:[0,1], style:[0,1], lights:[0,1], lightLayout:[0,1], lightShape:[0,1], horns:[0,1], hornSize:[0,1], pattern:[0,1], spoiler:[0,1], spoilerStyle:[0,1] };
+      const isTracked = g => g.drive >= .52;
+      const genomeColor = g => `hsl(${Math.round(g.hue*360)} 72% ${42+Math.round(g.shape*9)}%)`;
+      const archetypeName = g => ['Багги','Джип','Вездеход'][Math.min(2,Math.floor(g.style*3))];
+      function crossover(a,b) {
+        const g = {};
+        Object.keys(bounds).forEach(k => { if(k==='drive')g[k]=rng.next()<.5?a[k]:b[k];else{const mix=rng.between(.18,.82);g[k]=lerp(a[k],b[k],mix);} });
+        return g;
+      }
+      function mutate(g) {
+        let changed = 0;
+        Object.keys(bounds).forEach(k => {
+          if (rng.next() < mutationRate) {
+            const [lo,hi] = bounds[k];
+            g[k] = k==='drive' ? (g[k]>=.52?rng.between(0,.45):rng.between(.58,1)) : clamp(g[k] + (rng.next()+rng.next()+rng.next()-1.5)*(hi-lo)*.22, lo, hi);
+            changed++;
+          }
+        });
+        return {genome:g, changed};
+      }
+
+      function createCar(genome, index) {
+        return {
+          g: {...genome}, id: index+1, x: START_X, y: groundY(START_X)-45, vx: 0, vy: 0,
+          angle: 0, av: 0, alive: true, finished: false, bestX: START_X, still: 0, contacts: 0,
+          color: genomeColor(genome), score: 0, completed: false, wheelDamage: 0, frameDamage: 0, outcome: '', susp:[0,0,0]
+        };
+      }
+      function startPopulation(genomes) {
+        populationSize = +ui.population.value;
+        cars = Array.from({length: populationSize}, (_,i) => createCar(genomes?.[i] || randomGenome(), i));
+        breedingPlan=[];breedIndex=0;breedClock=0;
+        generationGhost = null; generationGhostGenome = null; generationGhostId = null;
+        updateMiniBoard(); startRun(0); last = performance.now();
+      }
+      function resetCar(car) {
+        Object.assign(car,{x:START_X,y:groundY(START_X)-45,vx:0,vy:0,angle:0,av:0,alive:true,
+          finished:false,bestX:START_X,still:0,contacts:0,score:0,completed:false,wheelDamage:0,frameDamage:0,outcome:'',susp:[0,0,0]});
+      }
+      function startRun(index) {
+        currentIndex=index; const car=cars[currentIndex]; resetCar(car);
+        elapsed=0; cameraX=0; runTrace=[{t:0,x:car.x,y:car.y,angle:0,susp:[0,0,0]}]; nextTraceAt=TRACE_STEP;
+        const trace=carryGhost?.trace;
+        raceGhost=trace ? {trace, genome:carryGhost.genome, id:carryGhost.id,generation:carryGhost.generation} : null;
+        phase='racing'; phaseTimer=0; ui.next.disabled=false; ui.statusText.textContent=`заезд #${String(car.id).padStart(2,'0')}`;
+        ui.outcomeBanner.classList.remove('show','success','neutral');
+        ui.statusDot.classList.toggle('paused',paused); showToast(index===0 ? `Поколение ${generation}: первый заезд` : `На трассе машина #${String(car.id).padStart(2,'0')}`);
+      }
+
+      function suspensionY(g){return g.height*.48+g.travel*.24;}
+      function applyWheel(car, localX, dt, driveShare) {
+        const g=car.g, c=Math.cos(car.angle), s=Math.sin(car.angle);
+        const localY=suspensionY(g),rx=localX*c-localY*s,ry=localX*s+localY*c;
+        const comRx=g.comX*c-g.comY*s,comRy=g.comX*s+g.comY*c,torqueX=rx-comRx,torqueY=ry-comRy;
+        const wx=car.x+rx, wy=car.y+ry, gy=groundY(wx), slope=terrainSlope(wx);
+        const penetration = wy + g.wheel - gy;
+        if (penetration <= 0) return;
+        const suspIndex=localX<-g.base*.2?0:localX>g.base*.2?2:1;
+        car.susp[suspIndex]=lerp(car.susp[suspIndex],clamp(penetration/g.travel,0,1),.32);
+        car.contacts++;
+        let nx=slope, ny=-1, nl=Math.hypot(nx,ny); nx/=nl; ny/=nl;
+        const tx=-ny, ty=nx;
+        const pvx=car.vx-car.av*torqueY, pvy=car.vy+car.av*torqueX;
+        const normalVel=pvx*nx+pvy*ny;
+        const overTravel=Math.max(0,penetration-g.travel);
+        const springForce=Math.max(0, Math.min(penetration,g.travel)*g.spring - normalVel*g.damp);
+        const tiltRisk=Math.max(0,Math.abs(car.angle)-.28)+Math.abs(car.av)*.12;
+        const tractionControl=clamp(1-tiltRisk*g.control*.72,.16,1);
+        const motorForce=g.motor*g.grip*driveShare*(isTracked(g) ? .84 : 1)*tractionControl;
+        const slip=pvx*tx+pvy*ty;
+        const friction=clamp(-slip*1.4, -motorForce*.45, motorForce*.45);
+        const fx=nx*springForce + tx*(motorForce+friction);
+        const fy=ny*springForce + ty*(motorForce+friction);
+        car.vx += fx/g.mass*dt; car.vy += fy/g.mass*dt;
+        car.av += (torqueX*fy-torqueY*fx)/(g.mass*(g.base*g.base*.28))*dt;
+        car.wheelDamage += (overTravel*.035 + Math.max(0,-normalVel-18)*.018)*dt;
+        if (penetration > g.wheel*.7) car.y -= penetration*.12;
+      }
+
+      function fail(car,reason){if(car.outcome)return;car.outcome=reason;car.alive=false;}
+
+      function physics(car, dt) {
+        if (!car.alive) return;
+        car.contacts=0;car.susp=car.susp.map(v=>v*.9);car.vy += 28*dt;
+        if(isTracked(car.g)){
+          applyWheel(car,-car.g.base*.5,dt,.34);applyWheel(car,0,dt,.32);applyWheel(car,car.g.base*.5,dt,.34);
+          car.av*=Math.pow(.992,dt*60);
+        }else{
+          applyWheel(car,-car.g.base*.5,dt,.5);applyWheel(car,car.g.base*.5,dt,.5);
+        }
+        if(car.contacts)car.av+=(-car.angle*5.8-car.av*2.4)*car.g.control/car.g.mass*dt;
+        car.vx *= Math.pow(.997, dt*60); car.av *= Math.pow(.985,dt*60);
+        car.x += car.vx*dt; car.y += car.vy*dt; car.angle += car.av*dt;
+        car.angle = ((car.angle+Math.PI)%(Math.PI*2))-Math.PI;
+        const bodyBottom=car.y+car.g.height*.8;
+        const gy=groundY(car.x);
+        if(bodyBottom>gy){const impact=Math.max(0,car.vy);car.y-=(bodyBottom-gy)*.65;car.vy=Math.min(car.vy,-2);car.vx*=.982;car.av*=.83;if(impact>16)car.frameDamage+=(impact-16)*.018/car.g.frame;}
+        car.bestX=Math.max(car.bestX,car.x);
+        if(car.vx<2.2 && car.x>START_X+12) car.still+=dt; else car.still=Math.max(0,car.still-dt*.4);
+        if(car.wheelDamage>(isTracked(car.g)?1.48:1.08)*car.g.frame)fail(car,isTracked(car.g)?'track':'wheel');
+        else if(car.frameDamage>1.08*car.g.frame)fail(car,'frame');
+        else if(car.still>4.2)fail(car,'stuck');
+        else if(car.y>groundBase+230)fail(car,'fall');
+        else if(Math.abs(car.angle)>2.7)fail(car,'rollover');
+        if(car.x>=WORLD_END){car.finished=true;car.outcome='finish';car.alive=false;car.bestX=WORLD_END;}
+        car.score=(car.bestX-START_X) + (car.finished?2500:0) - Math.abs(car.angle)*5;
+      }
+
+      function selectParent(sorted) {
+        const pool = sorted.slice(0, Math.max(3, Math.ceil(sorted.length*.45)));
+        const a=pool[Math.floor(rng.next()*pool.length)], b=pool[Math.floor(rng.next()*pool.length)];
+        return a.score>b.score?a:b;
+      }
+      function finishRun(manual=false) {
+        if(phase!=='racing') return;
+        const car=cars[currentIndex];
+        if(!car.outcome)car.outcome=manual?'manual':elapsed>=RUN_TIME?'timeout':car.finished?'finish':'stopped';
+        car.alive=false; car.completed=true;
+        car.score=(car.bestX-START_X)+(car.finished?2500:0)-Math.abs(car.angle)*5;
+        runTrace.push({t:elapsed,x:car.x,y:car.y,angle:car.angle,susp:[...car.susp]});
+        const best=cars.filter(c=>c.completed).sort((a,b)=>b.score-a.score)[0];
+        if(best===car){generationGhost=runTrace.map(p=>({...p}));generationGhostGenome={...car.g};generationGhostId=car.id;}
+        updateMiniBoard(); phase='between';phaseTimer=manual ? 1.2 : 2.5;ui.next.disabled=true;
+        const outcome=outcomeInfo(car.outcome);ui.statusText.textContent=outcome.short;showOutcome(car,outcome);
+      }
+      function rankOf(car) { return cars.filter(c=>c.completed).sort((a,b)=>b.score-a.score).indexOf(car)+1; }
+      function meters(car){return Math.max(0,(car.bestX-START_X)/8);}
+      function outcomeInfo(code){
+        return ({
+          finish:{title:'Финиш!',detail:'Трасса полностью пройдена',short:'успешный финиш',icon:'✓',tone:'success'},
+          timeout:{title:'Время вышло',detail:`Машина не успела пройти трассу за ${RUN_TIME} секунд`,short:'лимит времени',icon:'◷',tone:'neutral'},
+          stuck:{title:'Машина застряла',detail:'Скорость оставалась слишком низкой более 4 секунд',short:'застряла',icon:'≋',tone:'danger'},
+          rollover:{title:'Критический переворот',detail:'Угол наклона превысил безопасный предел',short:'перевернулась',icon:'↻',tone:'danger'},
+          frame:{title:'Разрушена рама',detail:'Суммарная сила ударов превысила прочность конструкции',short:'сломана рама',icon:'✕',tone:'danger'},
+          wheel:{title:'Отказ колеса',detail:'Подвеска исчерпала ход, а ударная нагрузка разрушила узел',short:'отвалилось колесо',icon:'○',tone:'danger'},
+          track:{title:'Слетела гусеница',detail:'Ударная нагрузка превысила прочность ходовой',short:'отказ гусеницы',icon:'⊘',tone:'danger'},
+          fall:{title:'Падение с трассы',detail:'Машина покинула безопасную область полигона',short:'сорвалась с трассы',icon:'↓',tone:'danger'},
+          manual:{title:'Заезд остановлен',detail:'Результат зафиксирован пользователем',short:'ручная остановка',icon:'■',tone:'neutral'},
+          stopped:{title:'Заезд прекращён',detail:'Машина больше не может продолжать движение',short:'остановлена',icon:'!',tone:'danger'}
+        })[code]||{title:'Заезд завершён',detail:'Результат зафиксирован',short:'завершён',icon:'!',tone:'neutral'};
+      }
+      function showOutcome(car,info){
+        ui.outcomeBanner.classList.remove('success','neutral');if(info.tone!=='danger')ui.outcomeBanner.classList.add(info.tone);
+        ui.outcomeIcon.textContent=info.icon;ui.outcomeTitle.textContent=info.title;ui.outcomeDetail.textContent=`${info.detail} · текущее место ${rankOf(car)}`;
+        ui.outcomeDistance.textContent=`${meters(car).toFixed(1)} м`;ui.outcomeBanner.classList.add('show');
+      }
+      function showResults(restoring=false) {
+        phase='results'; const sorted=sortedResults(), best=sorted[0], bestMeters=meters(best);
+        if(!restoring){
+          history.push(bestMeters);record=Math.max(record,bestMeters);
+          if(!carryGhost||best.score>carryGhost.score)carryGhost={trace:generationGhost.map(p=>({...p,susp:[...(p.susp||[0,0,0])]})),genome:{...generationGhostGenome},id:generationGhostId,generation,score:best.score};
+          champions.unshift({generation,id:best.id,g:{...best.g},meters:bestMeters,bestX:best.bestX,outcome:best.outcome,finished:best.finished});
+          champions=champions.slice(0,10);
+        }
+        updateChart();renderChampions();
+        ui.resultsGeneration.textContent=String(generation).padStart(2,'0');ui.resultsBest.textContent=`${bestMeters.toFixed(1)} м`;
+        ui.resultsRows.innerHTML=sorted.slice(0,5).map((c,i)=>`<tr><td>${i+1}</td><td><span class="car-chip" style="--chip:${c.color}"><i></i>#${String(c.id).padStart(2,'0')}</span></td><td>${isTracked(c.g)?'гусеницы':'колёса'}</td><td>${outcomeInfo(c.outcome).short}</td><td class="fitness">${meters(c).toFixed(1)} м</td></tr>`).join('');
+        phaseTimer=5;ui.showBreeding.textContent='Показать селекцию → · 5';openOverlay(ui.resultsOverlay);ui.statusText.textContent='итоги поколения';ui.next.disabled=true;
+      }
+      function achievementFor(record){
+        if(record.finished)return ['Покорил весь полигон','Полный финиш'];
+        const reached=[...courseZones].reverse().find(z=>record.bestX>=z.x);
+        return reached?[`Достиг секции «${reached.name}»`,outcomeInfo(record.outcome).short]:['Покинул стартовую зону',outcomeInfo(record.outcome).short];
+      }
+      function renderChampions(){
+        const records=champions.slice(0,archiveLimit);
+        ui.championsRows.innerHTML=records.length?records.map((r,i)=>{const a=achievementFor(r);return `<tr><td><strong>G${String(r.generation).padStart(2,'0')}</strong></td><td><canvas class="champion-thumb" data-thumb="${i}" width="224" height="96" aria-label="Машина-чемпион поколения ${r.generation}"></canvas></td><td>${archetypeName(r.g)} · ${isTracked(r.g)?'гусеницы':'колёса'}<br><small>${r.g.mass.toFixed(1)} т · CTRL ${r.g.control.toFixed(2)}</small></td><td class="champ-achievement"><strong>${a[0]}</strong><span>${a[1]}</span></td><td class="fitness">${r.meters.toFixed(1)} м</td></tr>`}).join(''):'<tr><td colspan="5" class="empty-archive">Завершите первое поколение — здесь появится чемпион.</td></tr>';
+        ui.championsRows.querySelectorAll('[data-thumb]').forEach((canvas,i)=>drawChampionThumb(canvas,records[i].g));
+        const dockRecords=champions.slice(0,3);ui.champDockRows.innerHTML=dockRecords.length?dockRecords.map((r,i)=>`<div class="dock-row"><canvas data-dock-thumb="${i}" width="68" height="44"></canvas><div><b>G${String(r.generation).padStart(2,'0')}</b><span>машина #${String(r.id).padStart(2,'0')}</span></div><em>${r.meters.toFixed(1)} м</em></div>`).join(''):'<div class="dock-empty">Завершите первое поколение</div>';
+        ui.champDockRows.querySelectorAll('[data-dock-thumb]').forEach((canvas,i)=>drawChampionThumb(canvas,dockRecords[i].g));
+      }
+      function openChampions(){if(phase==='archive'||awaitingResume)return;phaseBeforeArchive=phase;phase='archive';renderChampions();openOverlay(ui.championsOverlay);}
+      function closeChampions(){closeOverlay(ui.championsOverlay);phase=phaseBeforeArchive;}
+      function sortedResults(){return [...cars].sort((a,b)=>b.score-a.score);}
+      function buildBreedingPlan(){
+        const sorted=sortedResults(), elite=Math.min(2,populationSize), plan=[];
+        for(let i=0;i<elite;i++)plan.push({genome:{...sorted[i].g},type:'elite',parents:[sorted[i]],mutations:0});
+        while(plan.length<populationSize){const a=selectParent(sorted),b=selectParent(sorted),m=mutate(crossover(a.g,b.g));plan.push({genome:m.genome,type:'child',parents:[a,b],mutations:m.changed});}
+        return plan;
+      }
+      function beginBreeding(restoring=false){
+        if(phase!=='results'&&!restoring)return;
+        closeOverlay(ui.resultsOverlay);openOverlay(ui.breedingOverlay);phase='breeding';
+        if(!restoring)breedingPlan=buildBreedingPlan();breedIndex=0;breedClock=.38;
+        ui.nextGeneration.textContent=String(generation+1).padStart(2,'0');ui.offspringCount.textContent=`0 / ${populationSize}`;
+        ui.offspringGrid.innerHTML=breedingPlan.map((p,i)=>`<div class="offspring" id="offspring-${i}"><b>#${String(i+1).padStart(2,'0')}</b><span>${p.type==='elite'?'копия #'+String(p.parents[0].id).padStart(2,'0'):'#'+String(p.parents[0].id).padStart(2,'0')+' × #'+String(p.parents[1].id).padStart(2,'0')}</span><em>${p.mutations?`μ ${p.mutations}`:'элита'}</em></div>`).join('');
+        ui.breedingProgress.style.width='0%';ui.startNext.disabled=true;ui.startNext.textContent=`Создаём поколение ${generation+1}…`;
+        ui.statusText.textContent='синтез геномов'; renderCross(null);
+      }
+      function revealOffspring(){
+        if(breedIndex>=breedingPlan.length)return;
+        const item=breedingPlan[breedIndex];document.getElementById(`offspring-${breedIndex}`).classList.add('show');
+        breedIndex++;ui.offspringCount.textContent=`${breedIndex} / ${populationSize}`;ui.breedingProgress.style.width=`${breedIndex/populationSize*100}%`;renderCross(item,breedIndex);
+        if(breedIndex===breedingPlan.length){phaseTimer=5;ui.startNext.disabled=false;ui.startNext.textContent=`Начать поколение ${generation+1} · 5`;ui.breedingNote.textContent='Новое поколение готово. Автоматический старт через 5 секунд.';ui.crossTitle.textContent='Поколение собрано';ui.crossMeta.textContent=`${breedingPlan.reduce((s,p)=>s+p.mutations,0)} мутаций всего`;}
+      }
+      function dnaBars(g){return `<div class="dna-bars">${['wheel','base','motor','spring'].map(k=>{const [lo,hi]=bounds[k];return `<i style="height:${Math.round(3+(g[k]-lo)/(hi-lo)*11)}px"></i>`}).join('')}</div>`;}
+      function renderCross(item,index=0){
+        if(!item){ui.parentFlow.innerHTML='<div class="dna-card"><small>ожидание</small><strong>Выбираем элиту…</strong></div><div class="flow-symbol">→</div><div class="dna-card"><small>генофонд</small><strong>Лучшие результаты</strong></div><div class="flow-symbol">→</div><div class="dna-card child"><small>потомок</small><strong>Новый геном</strong></div>';return;}
+        const child=`<div class="dna-card child"><small>машина #${String(index).padStart(2,'0')}</small><strong>${item.type==='elite'?'точная копия':item.mutations+' мут. генов'}</strong>${dnaBars(item.genome)}</div>`;
+        if(item.type==='elite'){
+          ui.crossTitle.textContent='Сохраняем элиту';ui.crossMeta.textContent='без изменений';const p=item.parents[0];
+          ui.parentFlow.innerHTML=`<div class="dna-card"><small>чемпион</small><strong>#${String(p.id).padStart(2,'0')} · ${meters(p).toFixed(1)} м</strong>${dnaBars(p.g)}</div><div class="flow-symbol">→</div><div class="dna-card"><small>операция</small><strong>Копирование</strong></div><div class="flow-symbol">→</div>${child}`;
+        }else{
+          ui.crossTitle.textContent='Скрещиваем родителей';ui.crossMeta.textContent=item.mutations?`мутация: ${item.mutations} ген(а)`:'без мутаций';const [a,b]=item.parents;
+          ui.parentFlow.innerHTML=`<div class="dna-card"><small>родитель A</small><strong>#${String(a.id).padStart(2,'0')} · ${meters(a).toFixed(1)} м</strong>${dnaBars(a.g)}</div><div class="flow-symbol">×</div><div class="dna-card"><small>родитель B</small><strong>#${String(b.id).padStart(2,'0')} · ${meters(b).toFixed(1)} м</strong>${dnaBars(b.g)}</div><div class="flow-symbol">→</div>${child}`;
+        }
+      }
+      function launchNextGeneration(){
+        if(breedIndex<breedingPlan.length)return;closeOverlay(ui.breedingOverlay);generation++;startPopulation(breedingPlan.map(p=>p.genome));
+      }
+      function openOverlay(el){el.classList.add('open');el.setAttribute('aria-hidden','false');}
+      function closeOverlay(el){el.classList.remove('open');el.setAttribute('aria-hidden','true');}
+      function updateMiniBoard(){
+        const done=sortedResults().filter(c=>c.completed).slice(0,5);
+        ui.miniBoard.innerHTML=done.length?done.map((c,i)=>`<div class="mini-row" title="${outcomeInfo(c.outcome).title}"><span class="rank">${i+1}</span><span class="name">${outcomeInfo(c.outcome).icon} Машина #${String(c.id).padStart(2,'0')}</span><span class="result">${meters(c).toFixed(1)} м</span></div>`).join(''):'<div class="mini-empty">Рейтинг появится после первого заезда</div>';
+      }
+
+      function resetAll() {
+        generation=1; history=[]; champions=[];record=0;paused=false;ui.toggle.textContent='Пауза';
+        carryGhost=null;closeOverlay(ui.resultsOverlay);closeOverlay(ui.breedingOverlay);closeOverlay(ui.championsOverlay);renderChampions();ui.statusDot.classList.remove('paused');
+        awaitingResume=false;savedExperiment=null;closeOverlay($('resumeOverlay'));startPopulation();updateChart();showToast('Эксперимент начат заново');saveExperiment();
+      }
+
+      function activeCar(){return cars[currentIndex];}
+      function update(dt) {
+        if(awaitingResume||phase==='archive')return;
+        if(phase==='results'){
+          phaseTimer-=dt;const seconds=Math.max(0,Math.ceil(phaseTimer));ui.showBreeding.textContent=`Показать селекцию → · ${seconds}`;
+          if(phaseTimer<=0)beginBreeding();return;
+        }
+        if(phase==='breeding'){
+          if(breedIndex<breedingPlan.length){breedClock-=dt;if(breedClock<=0){revealOffspring();breedClock=.34;}}
+          else if(phaseTimer>0){phaseTimer-=dt;const seconds=Math.max(0,Math.ceil(phaseTimer));ui.startNext.textContent=`Начать поколение ${generation+1} · ${seconds}`;ui.breedingNote.textContent=`Новое поколение готово. Автоматический старт через ${seconds} сек.`;if(phaseTimer<=0)launchNextGeneration();}
+          return;
+        }
+        if(phase==='between'){
+          phaseTimer-=dt;if(phaseTimer<=0){currentIndex+1<cars.length?startRun(currentIndex+1):showResults();}
+          return;
+        }
+        const speed=+ui.speed.value,fixed=1/60,car=activeCar();
+        if(phase==='racing'&&!paused){
+          const steps=Math.max(1,Math.round(speed));
+          for(let i=0;i<steps&&phase==='racing';i++){
+            physics(car,fixed);elapsed+=fixed;
+            if(elapsed>=nextTraceAt){runTrace.push({t:elapsed,x:car.x,y:car.y,angle:car.angle,susp:[...car.susp]});nextTraceAt+=TRACE_STEP;}
+            if(elapsed>=RUN_TIME||!car.alive)finishRun();
+          }
+        }
+        if(!car)return;const target=Math.max(0,car.x-W*.38);cameraX=lerp(cameraX,target,1-Math.pow(.0008,dt));
+        ui.generation.textContent=String(generation).padStart(2,'0');ui.distance.textContent=meters(car).toFixed(1);
+        ui.alive.textContent=`${currentIndex+1} / ${cars.length}`;ui.timer.textContent=`${Math.max(0,RUN_TIME-elapsed).toFixed(1)} с`;
+        ui.leaderId.textContent='#'+String(car.id).padStart(2,'0');
+        const vals=[(car.g.wheel-12)/15,(car.g.base-42)/42,(car.g.motor-22)/40,(car.g.spring-38)/54];
+        vals.forEach((v,i)=>ui.genes[i].style.width=`${clamp(v,0,1)*100}%`);
+        ui.driveType.textContent=`${archetypeName(car.g)} · ${isTracked(car.g)?'гусеницы':'колёса'}`;
+        ui.driveType.style.background=car.color;ui.driveType.style.color='white';
+        ui.geneWheel.textContent=`${car.g.wheel.toFixed(1)} см`;ui.geneBase.textContent=`${car.g.base.toFixed(0)} см`;
+        ui.geneMotor.textContent=car.g.motor.toFixed(1);ui.geneSpring.textContent=car.g.spring.toFixed(0);
+        ui.geneTravel.textContent=`${car.g.travel.toFixed(1)} см`;ui.geneHeight.textContent=`${car.g.height.toFixed(1)} см`;
+        ui.geneGrip.textContent=car.g.grip.toFixed(2);ui.geneFrame.textContent=car.g.frame.toFixed(2);ui.geneMass.textContent=car.g.mass.toFixed(2);
+        ui.geneComY.textContent=`${car.g.comY>=0?'↓':'↑'} ${Math.abs(car.g.comY).toFixed(1)}`;
+        ui.geneComX.textContent=`${car.g.comX>=0?'→':'←'} ${Math.abs(car.g.comX).toFixed(1)}`;ui.geneControl.textContent=car.g.control.toFixed(2);
+      }
+
+      function resize() {
+        dpr=Math.min(window.devicePixelRatio||1,2); const rect=canvas.getBoundingClientRect(); W=rect.width; H=rect.height;
+        canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); ctx.setTransform(dpr,0,0,dpr,0,0);
+        groundBase=H*.66;
+      }
+
+      function sky() {
+        const grd=ctx.createLinearGradient(0,0,0,H); grd.addColorStop(0,'#77866e'); grd.addColorStop(.56,'#c6cdb4'); grd.addColorStop(1,'#e6dfcf');
+        ctx.fillStyle=grd; ctx.fillRect(0,0,W,H);
+        ctx.globalAlpha=.13; ctx.fillStyle='#f5f0d8';
+        for(let i=0;i<7;i++){const x=((i*271-cameraX*.035)%(W+300))-100; ctx.beginPath();ctx.ellipse(x,110+(i%3)*38,170,26,0,0,Math.PI*2);ctx.fill();}
+        ctx.globalAlpha=1;
+        drawMountain(.08,H*.49,'#87927c',115,220); drawMountain(.17,H*.57,'#68755f',75,155);
+      }
+      function drawMountain(parallax,base,color,amp,span){
+        ctx.beginPath();ctx.moveTo(0,H);ctx.lineTo(0,base);
+        for(let x=0;x<=W+30;x+=30){const wx=x+cameraX*parallax; const y=base-Math.abs(Math.sin(wx/span))*amp-Math.sin(wx*.011)*20;ctx.lineTo(x,y);}
+        ctx.lineTo(W,H);ctx.closePath();ctx.fillStyle=color;ctx.fill();
+      }
+      function drawTerrain() {
+        const start=Math.max(0,Math.floor((cameraX-350+300)/TERRAIN_STEP));
+        const end=Math.min(terrain.length-1,Math.ceil((cameraX+W+350+300)/TERRAIN_STEP));
+        ctx.beginPath();ctx.moveTo(terrain[start].x-cameraX,H);
+        for(let i=start;i<=end;i++)ctx.lineTo(terrain[i].x-cameraX,groundBase+terrain[i].y);
+        ctx.lineTo(terrain[end].x-cameraX,H);ctx.closePath();
+        const soil=ctx.createLinearGradient(0,groundBase-50,0,H);soil.addColorStop(0,'#4b5140');soil.addColorStop(.12,'#343a2f');soil.addColorStop(1,'#1c211b');ctx.fillStyle=soil;ctx.fill();
+        ctx.beginPath();for(let i=start;i<=end;i++){const p=terrain[i];i===start?ctx.moveTo(p.x-cameraX,groundBase+p.y):ctx.lineTo(p.x-cameraX,groundBase+p.y);}
+        ctx.strokeStyle='#a9b17d';ctx.lineWidth=4;ctx.stroke();
+        ctx.strokeStyle='rgba(216,224,171,.36)';ctx.lineWidth=1;ctx.setLineDash([2,7]);ctx.stroke();ctx.setLineDash([]);
+        rocks.forEach(r=>{const x=r.x-cameraX;if(x<-45||x>W+45)return;const y=groundY(r.x)+(r.major?r.size:0);ctx.save();ctx.translate(x,y-2);ctx.rotate(r.tilt);ctx.fillStyle=r.major?'#3c4237':'#5b604f';ctx.strokeStyle='rgba(211,220,190,.24)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-r.size,0);ctx.lineTo(-r.size*.72,-r.size*.72);ctx.lineTo(-r.size*.12,-r.size);ctx.lineTo(r.size*.68,-r.size*.64);ctx.lineTo(r.size,0);ctx.closePath();ctx.fill();if(r.major)ctx.stroke();ctx.restore();});
+        const finishX=WORLD_END-cameraX;if(finishX>-50&&finishX<W+50){ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(finishX,groundY(WORLD_END));ctx.lineTo(finishX,groundY(WORLD_END)-105);ctx.stroke();ctx.fillStyle='#d7f23d';ctx.fillRect(finishX,groundY(WORLD_END)-105,34,21);}
+      }
+      function drawCourseZones(){
+        courseZones.forEach((z,i)=>{const x=z.x-cameraX;if(x<-120||x>W+120)return;const y=groundY(z.x)-72;
+          ctx.strokeStyle='rgba(255,255,255,.3)';ctx.lineWidth=1;ctx.setLineDash([3,5]);ctx.beginPath();ctx.moveTo(x,y+22);ctx.lineTo(x,groundY(z.x)-8);ctx.stroke();ctx.setLineDash([]);
+          ctx.fillStyle='rgba(20,25,17,.65)';roundRect(x-7,y-8,102,22,8);ctx.fill();ctx.fillStyle=i===0?'#d7f23d':'rgba(255,255,255,.78)';ctx.font='600 8px ui-monospace,monospace';ctx.textAlign='left';ctx.fillText(`${String(i+1).padStart(2,'0')} · ${z.name.toUpperCase()}`,x,y+5);
+        });
+      }
+      function roundRect(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);}
+      function drawSpring(x1,y1,x2,y2,turns,color,width){
+        ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x1,y1);
+        for(let i=1;i<turns*2;i++){const t=i/(turns*2),x=lerp(x1,x2,t)+(i%2?3:-3),y=lerp(y1,y2,t);ctx.lineTo(x,y);}
+        ctx.lineTo(x2,y2);ctx.stroke();
+      }
+      function bodyPath(c,g,width,height,flex=0){
+        const rearTop=-height*(.54+g.shape*.24),frontTop=-height*(.42+g.nose*.34),noseInset=width*(.03+g.nose*.12);
+        c.beginPath();c.moveTo(-width*.58,height*.28-flex);c.lineTo(-width*.58,-height*.3-flex);c.lineTo(-width*.42,rearTop-flex);
+        c.lineTo(width*.28,-height*(.62+g.shape*.12)+flex);c.lineTo(width*.58-noseInset,frontTop+flex);c.lineTo(width*.58,height*.18+flex);c.lineTo(width*.45,height*.28+flex);c.closePath();
+      }
+      function paintVehicle(c,g,id,color,susp=[0,0,0],spin=0,ghost=false){
+        c.save();c.lineJoin='round';c.lineCap='round';
+        if(ghost){c.globalAlpha*=.32;c.setLineDash([4,3]);}
+        const b=g.base,h=g.height*(.7+g.mass*.15),r=g.wheel,rest=suspensionY(g),flex=(susp[2]-susp[0])*g.travel*.18;
+        const axleY=[rest-susp[0]*g.travel*.42,rest-susp[1]*g.travel*.42,rest-susp[2]*g.travel*.42];
+        const ink=ghost?'#eff8ed':'#172327',metal=ghost?'#eff8ed':'#6d858c',accent=ghost?'#eff8ed':color;
+        const rr=(x,y,w,hh,rad,fill,stroke=null,line=1)=>{c.beginPath();c.roundRect(x,y,w,hh,rad);if(fill){c.fillStyle=fill;c.fill();}if(stroke){c.strokeStyle=stroke;c.lineWidth=line;c.stroke();}};
+        const tube=(points,shade=metal,width=3)=>{c.beginPath();points.forEach((p,i)=>i?c.lineTo(...p):c.moveTo(...p));c.strokeStyle=ink;c.lineWidth=width+2;c.stroke();c.strokeStyle=shade;c.lineWidth=width;c.stroke();};
+        const tire=(x,y,rad)=>{
+          const rubber=c.createRadialGradient(x-rad*.3,y-rad*.4,rad*.1,x,y,rad);rubber.addColorStop(0,ghost?'#eef6e9':'#4c5a60');rubber.addColorStop(.7,ghost?'#d6e3d0':'#243137');rubber.addColorStop(1,ghost?'#d6e3d0':'#101d23');
+          c.fillStyle=rubber;c.strokeStyle=ink;c.lineWidth=2.5;c.beginPath();c.arc(x,y,rad,0,Math.PI*2);c.fill();c.stroke();
+          c.save();c.translate(x,y);c.rotate(spin/rad);c.strokeStyle=ghost?ink:'#738087';c.lineWidth=2.1;
+          for(let i=0;i<12;i++){const a=i*Math.PI/6;c.beginPath();c.moveTo(Math.cos(a)*rad*.84,Math.sin(a)*rad*.84);c.lineTo(Math.cos(a)*rad*.97,Math.sin(a)*rad*.97);c.stroke();}
+          c.fillStyle=ghost?ink:'#a8b5b8';c.beginPath();c.arc(0,0,rad*.53,0,Math.PI*2);c.fill();c.strokeStyle=ink;c.lineWidth=1.8;c.stroke();
+          c.fillStyle=ghost?ink:'#354950';for(let i=0;i<5;i++){c.save();c.rotate(i*Math.PI*2/5);c.beginPath();c.roundRect(rad*.12,-rad*.055,rad*.3,rad*.11,1);c.fill();c.restore();}
+          c.fillStyle=accent;c.beginPath();c.arc(0,0,rad*.19,0,Math.PI*2);c.fill();c.restore();
+        };
+        if(isTracked(g)){
+          const by=(axleY[0]+axleY[2])/2;rr(-b*.66,by-r*.73,b*1.32,r*1.46,r*.67,ghost?ink:'#26363b',ink,3);
+          [-b*.46,0,b*.46].forEach((x,i)=>tire(x,axleY[i],r*.48));
+        }else{tire(-b*.5,axleY[0],r);tire(b*.5,axleY[2],r);}
+        [-1,1].forEach(side=>{
+          const x=side*b*.5,wy=side<0?axleY[0]:axleY[2],ay=side*flex-2;
+          tube([[side*b*.26,ay],[x,wy]],metal,2);
+          const sx=side*b*.34,ex=side*b*.46,ey=wy-r*.12;c.strokeStyle=ink;c.lineWidth=4;c.beginPath();c.moveTo(sx,-h*.04+side*flex);c.lineTo(ex,ey);c.stroke();
+          c.strokeStyle=ghost?ink:'#eac751';c.lineWidth=1.8;c.beginPath();const turns=5;
+          for(let i=0;i<=turns*2;i++){const t=i/(turns*2),px=lerp(sx,ex,t)+(i===0||i===turns*2?0:i%2?2.5:-2.5),py=lerp(-h*.04+side*flex,ey,t);i?c.lineTo(px,py):c.moveTo(px,py);}c.stroke();
+        });
+        tube([[-b*.52,axleY[0]*.25],[-b*.32,-flex],[0,flex*.15],[b*.32,flex],[b*.56,axleY[2]*.25]],metal,2.4);
+        const body=c.createLinearGradient(0,-h,0,h*.3);body.addColorStop(0,ghost?'#eef6e9':`hsl(${g.hue*360} 85% 73%)`);body.addColorStop(.42,accent);body.addColorStop(1,ghost?'#dae7d4':`hsl(${g.hue*360} 68% 32%)`);
+        bodyPath(c,g,b,h,flex);c.fillStyle=body;c.fill();c.strokeStyle=ink;c.lineWidth=2.3;c.stroke();
+        c.save();bodyPath(c,g,b,h,flex);c.clip();c.strokeStyle=ghost?ink:'rgba(255,255,255,.6)';c.lineWidth=2;
+        if(g.pattern<.34){for(let i=0;i<4;i++){c.beginPath();c.arc(-b*.31+i*b*.19,-h*.21+(i%2)*3,2.4,0,Math.PI*2);c.stroke();}}
+        else if(g.pattern<.68){for(let i=-2;i<=2;i++){c.beginPath();c.moveTo(i*11-8,-h*.75);c.lineTo(i*11+11,h*.3);c.stroke();}}
+        else{c.beginPath();c.moveTo(-b*.47,-h*.2);c.lineTo(-b*.12,-h*.34);c.lineTo(-b*.19,-h*.09);c.lineTo(b*.35,-h*.25);c.stroke();}c.restore();
+        const type=Math.min(2,Math.floor(g.style*3)),cx=lerp(-b*.26,-b*.05,g.cabin),cw=b*([.48,.55,.64][type]+g.shape*.04),ch=h*[.65,.92,.78][type],cy=-h*.64-ch;
+        // Open cockpit, windscreen and tubular safety cage are shared by all three off-road styles.
+        if(type===0){rr(cx+b*.1,-h*.63,cw*.45,8,3,ghost?ink:'#26343a');tube([[cx,-h*.61],[cx+cw*.12,cy],[cx+cw*.7,cy-1],[cx+cw,-h*.6]],accent,2.2);}
+        else{rr(cx,cy,cw,ch,type===1?3:6,body,ink,2.3);}
+        const glass=c.createLinearGradient(0,cy,0,cy+ch);glass.addColorStop(0,ghost?'#edf6e9':'#c5eff1');glass.addColorStop(1,ghost?'#d9e5d1':'#4d91a6');
+        c.beginPath();c.moveTo(cx+cw*.6,cy+3);c.lineTo(cx+cw*.77,cy+3);c.lineTo(cx+cw*.93,-h*.66);c.lineTo(cx+cw*.63,-h*.66);c.closePath();c.fillStyle=glass;c.fill();c.strokeStyle=ink;c.lineWidth=1.2;c.stroke();
+        if(type!==0)rr(cx+cw*.1,cy+ch*.15,cw*.44,ch*.57,2,glass,ink,1.3);
+        tube([[cx-b*.04,-h*.63],[cx+cw*.08,cy-2],[cx+cw*.75,cy-2],[cx+cw+b*.03,-h*.61]],metal,1.5);
+        tube([[cx+cw*.1,-h*.59],[cx+cw*.47,cy-1]],metal,1.3);
+        c.strokeStyle=ghost?ink:'rgba(255,255,255,.75)';c.lineWidth=1.1;c.beginPath();c.moveTo(cx+cw*.67,cy+5);c.lineTo(cx+cw*.8,cy+ch*.55);c.stroke();
+        // Sculpted wheel arches and bumpers give the body a recognisable buggy silhouette.
+        [-1,1].forEach(side=>{const wx=side*b*.5,wy=side<0?axleY[0]:axleY[2];c.strokeStyle=ink;c.lineWidth=5.5;c.beginPath();c.arc(wx,wy,r*1.04,Math.PI*1.08,Math.PI*1.87);c.stroke();c.strokeStyle=accent;c.lineWidth=3;c.stroke();});
+        tube([[b*.48,h*.12+flex],[b*.66,h*.02+flex],[b*.69,-h*.15+flex]],metal,1.6);
+        rr(-b*.4,-h*.36,9,3,1,ghost?ink:'#263a3d');rr(-b*.36,-h*.11,b*.65,3,1,ghost?ink:'rgba(14,28,32,.55)');
+        const roof=g.lightLayout>.55,count=1+Math.min(3,Math.floor(g.lights*4));
+        for(let i=0;i<count;i++){const lx=roof?lerp(cx+cw*.18,cx+cw*.72,count===1 ? .5 : i/(count-1)):b*.47,ly=roof?cy-5:-h*.28+i*4-count*1.5;rr(lx-3.2,ly-2.7,6.4,5.4,g.lightShape>.5?1:2.7,ghost?ink:'#fff3ba',ink,1.2);}
+        const horns=Math.min(2,Math.floor(g.horns*3)),hornLen=3+g.hornSize*8;c.strokeStyle=ghost?ink:'#f1e5c1';c.lineWidth=2.1;
+        for(let i=0;i<horns;i++){const hx=cx+cw*(horns===1 ? .4 : .2+i*.43);c.beginPath();c.moveTo(hx,cy);c.quadraticCurveTo(hx+(i?1:-1)*hornLen*.5,cy-hornLen*.6,hx+(i?1:-1)*hornLen,cy-hornLen);c.stroke();}
+        if(g.spoiler>.2){const sx=-b*.49,sw=9+g.spoiler*13,sy=-h*.75-g.spoilerStyle*5;tube([[sx,-h*.44],[sx-3,sy]],metal,1.5);rr(sx-sw*.68,sy-2,sw,4,1,accent,ink,1.4);}
+        if(!ghost){rr(-b*.57,-h*.24,3,5,1,'#ef6254',ink,1);c.fillStyle='#f5eedb';c.beginPath();c.arc(-b*.08,-h*.2,5,0,Math.PI*2);c.fill();c.fillStyle=ink;c.font='700 6px system-ui';c.textAlign='center';c.textBaseline='middle';c.fillText(String(id).padStart(2,'0'),-b*.08,-h*.2);}
+        c.restore();
+      }
+      function drawCar(car,mode='active'){
+        const x=car.x-cameraX;if(x<-130||x>W+130)return;ctx.save();ctx.translate(x,car.y);ctx.rotate(car.angle);
+        paintVehicle(ctx,car.g,car.id,car.color||genomeColor(car.g),car.susp||[0,0,0],car.x-START_X,mode==='ghost');ctx.restore();
+      }
+      function drawChampionThumb(canvas,g){
+        const c=canvas.getContext('2d'),w=canvas.width,h=canvas.height;c.clearRect(0,0,w,h);c.fillStyle='#d5ded3';c.fillRect(0,0,w,h);
+        c.fillStyle='#8c9c87';c.fillRect(0,h*.9,w,h*.1);const scale=Math.min(w/(g.base*1.6+g.wheel*2),h/(g.wheel*2+suspensionY(g)+g.height*2.2+20));
+        c.save();c.translate(w*.5,h*.5);c.scale(scale,scale);paintVehicle(c,g,0,genomeColor(g),[0,0,0],0,false);c.restore();
+      }
+      function ghostAt(time){
+        if(!raceGhost?.trace?.length)return null;const trace=raceGhost.trace,idx=clamp(Math.floor(time/TRACE_STEP),0,trace.length-1),p=trace[idx];
+        return {...p,g:raceGhost.genome,id:raceGhost.id};
+      }
+      function draw() {
+        ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);sky();drawTerrain();drawCourseZones();
+        const car=activeCar(),ghost=ghostAt(elapsed);if(ghost)drawCar(ghost,'ghost');if(car)drawCar(car,'active');
+        if(ghost&&car){const x=ghost.x-cameraX,y=ghost.y-ghost.g.height-40,diff=(ghost.x-car.x)/8;ctx.fillStyle='rgba(238,246,231,.22)';roundRect(x-57,y-13,114,21,10);ctx.fill();ctx.strokeStyle='rgba(238,246,231,.6)';ctx.stroke();ctx.fillStyle='white';ctx.font='600 8px ui-monospace,monospace';ctx.textAlign='center';ctx.fillText(`РЕКОРД G${raceGhost.generation||'?'} · ${diff>=0?'+':''}${diff.toFixed(1)} м`,x,y+1);}
+        if(car){const x=car.x-cameraX,y=car.y-car.g.height-39;ctx.fillStyle='rgba(20,25,17,.82)';roundRect(x-28,y-12,56,20,10);ctx.fill();ctx.fillStyle='#d7f23d';ctx.font='700 9px ui-monospace,monospace';ctx.textAlign='center';ctx.fillText(`МАШИНА ${String(car.id).padStart(2,'0')}`,x,y+1);}
+      }
+      function updateChart(){
+        if(!history.length){ui.line.setAttribute('d','');ui.area.setAttribute('d','');ui.record.textContent='рекорд 0.0 м';return;}
+        const max=Math.max(1,...history),pts=history.map((v,i)=>`${history.length===1?0:i/(history.length-1)*228},${48-v/max*41}`);
+        const d='M'+pts.join(' L');ui.line.setAttribute('d',d);ui.area.setAttribute('d',d+' L228,52 L0,52 Z');ui.record.textContent=`рекорд ${record.toFixed(1)} м`;
+      }
+      function showToast(text){clearTimeout(toastTimer);ui.toast.textContent=text;ui.toast.classList.add('show');toastTimer=setTimeout(()=>ui.toast.classList.remove('show'),1800);}
+      function frame(now){const dt=Math.min(.04,(now-last)/1000||0);last=now;update(dt);draw();saveClock+=dt;if(saveClock>=1){saveClock=0;saveExperiment();}requestAnimationFrame(frame);}
+
+      function saveExperiment(){
+        if(awaitingResume)return false;
+        const state={version:1,savedAt:Date.now(),generation,elapsed,paused,phase:phase==='archive'?phaseBeforeArchive:phase,
+          cars,history,populationSize,mutationRate,terrainVersion:2,record,currentIndex,phaseTimer,cameraX,groundBase,
+          runTrace,nextTraceAt,raceGhost,carryGhost,generationGhost,generationGhostGenome,generationGhostId,
+          breedingPlan,breedIndex,breedClock,champions,archiveLimit,seed:rng.seed,speed:+ui.speed.value};
+        try{localStorage.setItem(SAVE_KEY,JSON.stringify(state));$('saveStatus').textContent='Автосохранено';return true;}
+        catch(error){$('saveStatus').textContent='Сохранение недоступно';return false;}
+      }
+      function validExperiment(s){
+        const finite=Number.isFinite,genome=g=>g&&Object.entries(bounds).every(([k,[lo,hi]])=>finite(g[k])&&g[k]>=lo&&g[k]<=hi);
+        const trace=t=>Array.isArray(t)&&t.length<=10000&&t.every(p=>p&&['t','x','y','angle'].every(k=>finite(p[k]))&&(!p.susp||(Array.isArray(p.susp)&&p.susp.length===3&&p.susp.every(finite))));
+        const carId=id=>Number.isInteger(id)&&id>=1&&id<=24;
+        return s&&s.version===1&&s.terrainVersion===2&&Number.isInteger(s.generation)&&s.generation>=1&&
+          Number.isInteger(s.populationSize)&&s.populationSize>=6&&s.populationSize<=24&&Array.isArray(s.cars)&&s.cars.length===s.populationSize&&
+          s.cars.every(c=>c&&carId(c.id)&&genome(c.g)&&['x','y','vx','vy','angle','av','bestX','score','still','wheelDamage','frameDamage'].every(k=>finite(c[k]))&&Array.isArray(c.susp)&&c.susp.length===3&&c.susp.every(finite))&&
+          Number.isInteger(s.currentIndex)&&s.currentIndex>=0&&s.currentIndex<s.cars.length&&finite(s.elapsed)&&s.elapsed>=0&&s.elapsed<=RUN_TIME+.1&&finite(s.phaseTimer)&&finite(s.seed)&&finite(s.groundBase)&&finite(s.record)&&finite(s.savedAt)&&finite(s.cameraX)&&finite(s.nextTraceAt)&&finite(s.mutationRate)&&s.mutationRate>=.02&&s.mutationRate<=.35&&
+          ['racing','between','results','breeding'].includes(s.phase)&&trace(s.runTrace)&&Array.isArray(s.history)&&s.history.every(finite)&&
+          Array.isArray(s.champions)&&s.champions.length<=10&&s.champions.every(c=>genome(c.g)&&carId(c.id)&&Number.isInteger(c.generation)&&c.generation>=1&&finite(c.meters)&&finite(c.bestX))&&Array.isArray(s.breedingPlan)&&s.breedingPlan.length<=s.populationSize&&s.breedingPlan.every(p=>genome(p.genome)&&['elite','child'].includes(p.type)&&Number.isInteger(p.mutations)&&p.mutations>=0&&Array.isArray(p.parents)&&p.parents.length===(p.type==='elite'?1:2)&&p.parents.every(c=>genome(c.g)&&carId(c.id)&&finite(c.bestX)))&&Number.isInteger(s.breedIndex)&&s.breedIndex>=0&&s.breedIndex<=s.breedingPlan.length&&finite(s.breedClock)&&[5,10].includes(s.archiveLimit)&&
+          (!s.carryGhost||(genome(s.carryGhost.genome)&&trace(s.carryGhost.trace)&&finite(s.carryGhost.score)))&&
+          (!s.raceGhost||(genome(s.raceGhost.genome)&&trace(s.raceGhost.trace)))&&(!s.generationGhost||trace(s.generationGhost));
+      }
+      function offerSavedExperiment(){
+        try{const raw=localStorage.getItem(SAVE_KEY);if(!raw)return;const candidate=JSON.parse(raw);if(!validExperiment(candidate)){$('saveStatus').textContent='Сохранение несовместимо — новый эксперимент';return;}savedExperiment=candidate;}
+        catch(error){$('saveStatus').textContent='Сохранение недоступно';return;}
+        awaitingResume=true;$('resumeSummary').textContent=`Поколение ${savedExperiment.generation}, машина ${savedExperiment.currentIndex+1} из ${savedExperiment.populationSize}. Рекорд: ${savedExperiment.record.toFixed(1)} м. Сохранено: ${new Date(savedExperiment.savedAt).toLocaleString('ru-RU')}. Восстановим текущий заезд, геномы и историю чемпионов.`;
+        openOverlay($('resumeOverlay'));
+      }
+      function restoreExperiment(){
+        const s=savedExperiment;if(!s)return;awaitingResume=false;closeOverlay($('resumeOverlay'));
+        generation=s.generation;elapsed=s.elapsed;paused=s.paused;phase=s.phase;cars=s.cars;history=s.history;
+        populationSize=s.populationSize;mutationRate=s.mutationRate;record=s.record;currentIndex=s.currentIndex;phaseTimer=s.phaseTimer;cameraX=s.cameraX;
+        runTrace=s.runTrace;nextTraceAt=s.nextTraceAt;raceGhost=s.raceGhost;carryGhost=s.carryGhost;
+        generationGhost=s.generationGhost;generationGhostGenome=s.generationGhostGenome;generationGhostId=s.generationGhostId;
+        breedingPlan=s.breedingPlan;breedIndex=s.breedIndex;breedClock=s.breedClock;champions=s.champions;archiveLimit=s.archiveLimit;rng.seed=s.seed;
+        const dy=groundBase-s.groundBase;cars.forEach(c=>c.y+=dy);
+        const shifted=new Set();[runTrace,raceGhost?.trace,carryGhost?.trace,generationGhost].forEach(t=>{if(t&&!shifted.has(t)){shifted.add(t);t.forEach(p=>p.y+=dy);}});
+        ui.population.value=populationSize;ui.populationOut.textContent=populationSize;ui.mutation.value=Math.round(mutationRate*100);ui.mutationOut.textContent=`${Math.round(mutationRate*100)}%`;ui.speed.value=[1,2,4,8,16].includes(s.speed)?s.speed:8;
+        ui.toggle.textContent=paused?'Продолжить':'Пауза';ui.statusDot.classList.toggle('paused',paused);ui.statusText.textContent=paused?'на паузе':`заезд #${String(activeCar().id).padStart(2,'0')}`;ui.next.disabled=phase!=='racing';
+        cars.forEach(c=>c.color=genomeColor(c.g));ui.generation.textContent=String(generation).padStart(2,'0');ui.distance.textContent=meters(activeCar()).toFixed(1);ui.alive.textContent=`${currentIndex+1} / ${cars.length}`;ui.timer.textContent=`${Math.max(0,RUN_TIME-elapsed).toFixed(1)} с`;
+        if(phase==='results'){showResults(true);phaseTimer=s.phaseTimer;}
+        else if(phase==='breeding'){const count=s.breedIndex;beginBreeding(true);for(let i=0;i<count;i++)revealOffspring();phaseTimer=s.phaseTimer;breedClock=s.breedClock;}
+        else if(phase==='between')showOutcome(activeCar(),outcomeInfo(activeCar().outcome));
+        document.querySelectorAll('[data-limit]').forEach(b=>b.classList.toggle('active',+b.dataset.limit===archiveLimit));renderChampions();updateMiniBoard();updateChart();last=performance.now();saveExperiment();showToast('Эксперимент восстановлен');
+      }
+
+      ui.toggle.addEventListener('click',()=>{if(!['racing','between'].includes(phase))return;paused=!paused;ui.toggle.textContent=paused?'Продолжить':'Пауза';ui.statusText.textContent=paused?'на паузе':`заезд #${String(activeCar().id).padStart(2,'0')}`;ui.statusDot.classList.toggle('paused',paused);});
+      ui.next.addEventListener('click',()=>finishRun(true));ui.reset.addEventListener('click',resetAll);
+      ui.showBreeding.addEventListener('click',()=>beginBreeding());ui.startNext.addEventListener('click',launchNextGeneration);
+      ui.champions.addEventListener('click',openChampions);ui.closeChampions.addEventListener('click',closeChampions);
+      ui.expandChampions.addEventListener('click',openChampions);
+      document.querySelectorAll('[data-limit]').forEach(button=>button.addEventListener('click',()=>{archiveLimit=+button.dataset.limit;document.querySelectorAll('[data-limit]').forEach(b=>b.classList.toggle('active',b===button));renderChampions();}));
+      ui.population.addEventListener('input',()=>ui.populationOut.textContent=ui.population.value);
+      ui.population.addEventListener('change',()=>{populationSize=+ui.population.value;resetAll();});
+      ui.mutation.addEventListener('input',()=>{mutationRate=+ui.mutation.value/100;ui.mutationOut.textContent=ui.mutation.value+'%';});
+      window.addEventListener('resize',resize);
+      window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();ui.toggle.click();}if(e.key.toLowerCase()==='n'&&phase==='racing')ui.next.click();});
+
+      const saveStrip=document.createElement('div');saveStrip.className='save-strip';saveStrip.innerHTML='<span id="saveStatus" aria-live="polite">Автосохранение включено</span><button class="save-button" id="saveNow">Сохранить</button><button class="save-button" id="exportSave" title="Скачать резервную копию эксперимента">↓ JSON</button><button class="save-button" id="importSave" title="Восстановить эксперимент из файла">↑ JSON</button><input id="saveFile" type="file" accept=".json,application/json" hidden>';document.querySelector('.controls').appendChild(saveStrip);
+      $('saveNow').addEventListener('click',()=>showToast(saveExperiment()?'Эксперимент сохранён':'Не удалось сохранить в этом браузере'));
+      $('exportSave').addEventListener('click',()=>{
+        if(!saveExperiment()){showToast('Не удалось подготовить резервную копию');return;}
+        try{const blob=new Blob([localStorage.getItem(SAVE_KEY)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`genodrive-G${generation}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);showToast('Резервная копия скачана');}catch(error){showToast('Не удалось скачать резервную копию');}
+      });
+      $('importSave').addEventListener('click',()=>$('saveFile').click());
+      $('saveFile').addEventListener('change',async()=>{
+        const file=$('saveFile').files[0];$('saveFile').value='';if(!file)return;
+        try{if(file.size>8*1024*1024)throw new Error('size');const imported=JSON.parse(await file.text());if(!validExperiment(imported))throw new Error('invalid');savedExperiment=imported;closeOverlay(ui.resultsOverlay);closeOverlay(ui.breedingOverlay);closeOverlay(ui.championsOverlay);restoreExperiment();}catch(error){showToast('Файл не содержит совместимого сохранения');}
+      });
+      $('resumeSaved').addEventListener('click',restoreExperiment);$('startFresh').addEventListener('click',resetAll);
+      window.addEventListener('pagehide',saveExperiment);document.addEventListener('visibilitychange',()=>{if(document.hidden)saveExperiment();});
+      makeTerrain();resize();startPopulation();offerSavedExperiment();requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
