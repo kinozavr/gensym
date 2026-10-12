@@ -105,7 +105,7 @@
     .history-foot { display: flex; justify-content: space-between; color: rgba(255,255,255,.45); font: 9px ui-monospace, monospace; }
 
     .leader-card {
-      position: absolute; z-index: 4; right: 24px; bottom: 120px; width: 300px; padding: 12px 16px;
+      position: absolute; z-index: 4; right: 24px; bottom: 120px; width: 366px; max-height: calc(100% - 230px); overflow: auto; padding: 12px 16px;
       color: white; background: rgba(20,24,17,.48); border: 1px solid rgba(255,255,255,.12); border-radius: 14px; backdrop-filter: blur(9px);
     }
     .leader-card small { color: rgba(255,255,255,.52); text-transform: uppercase; letter-spacing: .1em; font-size: 9px; }
@@ -119,6 +119,17 @@
     .genome-cell { min-width: 0; }
     .genome-cell span { display: block; color: rgba(255,255,255,.4); font-size: 8px; text-transform: uppercase; letter-spacing: .05em; }
     .genome-cell b { display: block; margin-top: 1px; color: rgba(255,255,255,.88); font: 600 10px ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .comparison-meta { margin: 8px 0; color: rgba(255,255,255,.72); font-size: 10px; line-height: 1.5; }
+    .genome-comparison summary, .cosmetic-comparison summary { cursor: pointer; font-size: 11px; padding: 7px 0; }
+    .genome-tables { max-height: 258px; overflow: auto; scrollbar-width: thin; }
+    .comparison-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10px; }
+    .comparison-table th, .comparison-table td { padding: 5px 3px; border-bottom: 1px solid rgba(255,255,255,.09); text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .comparison-table th { color: rgba(255,255,255,.62); font-weight: 400; }
+    .comparison-table th:first-child, .comparison-table td:first-child { text-align: left; width: 34%; }
+    .comparison-table td:nth-child(2) { color: var(--acid); }
+    .comparison-table td:nth-child(3) { color: #c4e5ed; }
+    .comparison-table td:last-child { color: rgba(255,255,255,.64); font: 9px ui-monospace, monospace; }
+    .comparison-note { margin: 7px 0 0; font-size: 9px; line-height: 1.4; color: rgba(255,255,255,.48); }
     .mini-board { margin-top: 11px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 8px; display: grid; gap: 4px; }
     .mini-row { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 7px; font: 10px/1.4 ui-monospace, monospace; }
     .mini-row .rank { color: rgba(255,255,255,.38); }
@@ -238,7 +249,10 @@
     @media (max-width: 760px) {
       .app { min-height: 560px; }
       .brand { top: 16px; left: 16px; }
-      .brand span, .terrain-label, .leader-card { display: none; }
+      .brand span, .terrain-label { display: none; }
+      .leader-card { display: block; top: 124px; bottom: auto; right: 12px; width: min(340px, calc(100% - 24px)); max-height: 225px; padding: 8px 12px; }
+      .genome-tables { max-height: 112px; }
+      .leader-card .mini-board { display: none; }
       .top-stats { top: 66px; left: 16px; right: 16px; grid-template-columns: repeat(4, 1fr); }
       .stat { min-width: 0; padding: 9px 8px; }
       .stat-value { font-size: 14px; }
@@ -265,6 +279,7 @@
     <div class="brand" aria-label="Генодрайв">
       <div class="brand-mark">⌁</div>
       <div><strong>Генодрайв</strong><span>EVOLUTION LAB / 01</span></div>
+      <a href="pilava.html" style="margin-left:12px;padding:8px 10px;border:1px solid rgba(255,255,255,.35);border-radius:9px;color:#d7f23d;text-decoration:none;font-size:11px;text-shadow:none">Пилавы →</a>
     </div>
     <div class="terrain-label">Полигон «Базальтовый хребет» · фиксированная трасса</div>
 
@@ -272,7 +287,7 @@
       <div class="stat"><span class="stat-label">Поколение</span><span class="stat-value" id="generation">01</span></div>
       <div class="stat"><span class="stat-label">Дистанция</span><span class="stat-value"><em id="distance">0.0</em> м</span></div>
       <div class="stat"><span class="stat-label">Заезд</span><span class="stat-value" id="alive">1 / 12</span></div>
-      <div class="stat"><span class="stat-label">Осталось</span><span class="stat-value" id="timer">120.0 с</span></div>
+      <div class="stat"><span class="stat-label">Осталось</span><span class="stat-value" id="timer">180.0 с</span></div>
     </section>
 
     <aside class="panel" aria-label="Управление эволюцией">
@@ -307,27 +322,20 @@
       </div>
     </aside>
 
-    <section class="leader-card" aria-label="Гены лидера">
+    <section class="leader-card" aria-label="Сравнение генома текущей машины с абсолютным чемпионом">
       <small>Текущая машина · <span id="leaderId">#01</span></small>
-      <div class="genes" title="Колёса, база, тяга, подвеска">
-        <span class="gene"><i id="g0"></i></span><span class="gene"><i id="g1"></i></span>
-        <span class="gene"><i id="g2"></i></span><span class="gene"><i id="g3"></i></span>
-      </div>
       <div class="drive-line"><strong class="drive-badge" id="driveType">колёса</strong><span>наследуемый геном</span></div>
-      <div class="genome-grid">
-        <div class="genome-cell"><span>размер</span><b id="geneWheel">—</b></div>
-        <div class="genome-cell"><span>база</span><b id="geneBase">—</b></div>
-        <div class="genome-cell"><span>тяга</span><b id="geneMotor">—</b></div>
-        <div class="genome-cell"><span>пружина</span><b id="geneSpring">—</b></div>
-        <div class="genome-cell"><span>ход подв.</span><b id="geneTravel">—</b></div>
-        <div class="genome-cell"><span>клиренс</span><b id="geneHeight">—</b></div>
-        <div class="genome-cell"><span>сцепление</span><b id="geneGrip">—</b></div>
-        <div class="genome-cell"><span>рама</span><b id="geneFrame">—</b></div>
-        <div class="genome-cell"><span>масса</span><b id="geneMass">—</b></div>
-        <div class="genome-cell"><span>центр ↓</span><b id="geneComY">—</b></div>
-        <div class="genome-cell"><span>баланс ↔</span><b id="geneComX">—</b></div>
-        <div class="genome-cell"><span>анти‑ролл</span><b id="geneControl">—</b></div>
-      </div>
+      <div class="comparison-meta" id="comparisonChampion" aria-live="polite">Абсолютный чемпион появится после первого поколения</div>
+      <details class="genome-comparison" open>
+        <summary>Сравнение геномов</summary>
+        <div class="genome-tables">
+          <table class="comparison-table" aria-label="Сравнение физических генов"><thead><tr><th scope="col">Параметр</th><th scope="col">Машина</th><th scope="col">Чемпион</th><th scope="col">Δ</th></tr></thead><tbody id="physicalGenes"></tbody></table>
+          <details class="cosmetic-comparison"><summary>Внешность · наследуемые признаки</summary>
+            <table class="comparison-table" aria-label="Сравнение декоративных генов"><thead><tr><th scope="col">Параметр</th><th scope="col">Машина</th><th scope="col">Чемпион</th><th scope="col">Δ</th></tr></thead><tbody id="cosmeticGenes"></tbody></table>
+          </details>
+        </div>
+        <p class="comparison-note">Δ = машина − чемпион. Больше не всегда лучше. Декоративные гены не влияют на физику.</p>
+      </details>
       <div class="mini-board" id="miniBoard"><div class="mini-empty">Рейтинг появится после первого заезда</div></div>
     </section>
     <aside class="champ-dock" aria-label="Краткий список чемпионов">
@@ -444,17 +452,15 @@
         nextGeneration: $('nextGeneration'), offspringCount: $('offspringCount'), crossTitle: $('crossTitle'),
         crossMeta: $('crossMeta'), parentFlow: $('parentFlow'), offspringGrid: $('offspringGrid'),
         breedingProgress: $('breedingProgress'), breedingNote: $('breedingNote'), startNext: $('startNext'),
-        driveType: $('driveType'), geneWheel: $('geneWheel'), geneBase: $('geneBase'), geneMotor: $('geneMotor'),
-        geneSpring: $('geneSpring'), geneTravel: $('geneTravel'), geneHeight: $('geneHeight'), geneGrip: $('geneGrip'),
-        geneFrame: $('geneFrame'), geneMass: $('geneMass'), outcomeBanner: $('outcomeBanner'), outcomeIcon: $('outcomeIcon'),
+        driveType: $('driveType'), comparisonChampion: $('comparisonChampion'), physicalGenes: $('physicalGenes'), cosmeticGenes: $('cosmeticGenes'),
+        outcomeBanner: $('outcomeBanner'), outcomeIcon: $('outcomeIcon'),
         outcomeTitle: $('outcomeTitle'), outcomeDetail: $('outcomeDetail'), outcomeDistance: $('outcomeDistance'),
-        geneComY: $('geneComY'), geneComX: $('geneComX'), geneControl: $('geneControl'), champions: $('champions'),
+        champions: $('champions'),
         championsOverlay: $('championsOverlay'), closeChampions: $('closeChampions'), championsRows: $('championsRows'),
-        expandChampions: $('expandChampions'), champDockRows: $('champDockRows'),
-        genes: [$('g0'), $('g1'), $('g2'), $('g3')]
+        expandChampions: $('expandChampions'), champDockRows: $('champDockRows')
       };
 
-      const WORLD_END = 4300, START_X = 115, RUN_TIME = 120, TRACE_STEP = .05, TERRAIN_STEP = 16;
+      const WORLD_END = 4300, START_X = 115, RUN_TIME = 180, TRACE_STEP = .05, TERRAIN_STEP = 16;
       const palette = ['#d7f23d', '#ff7548', '#ffd166', '#72d6c9', '#b5a7ff', '#f18fb3', '#8bc6ff'];
       let dpr = 1, W = 0, H = 0, groundBase = 0, cameraX = 0;
       let generation = 1, elapsed = 0, paused = false, last = performance.now(), phase = 'racing';
@@ -527,9 +533,37 @@
         };
       }
       const bounds = { wheel:[12,27], base:[42,84], motor:[22,62], spring:[38,92], damp:[5,18], travel:[8,28], height:[13,30], grip:[.5,1.35], frame:[.65,1.55], mass:[.7,1.7], comY:[-8,10], comX:[-14,14], control:[0,1.3], drive:[0,1], hue:[0,1], shape:[0,1], cabin:[0,1], nose:[0,1], style:[0,1], lights:[0,1], lightLayout:[0,1], lightShape:[0,1], horns:[0,1], hornSize:[0,1], pattern:[0,1], spoiler:[0,1], spoilerStyle:[0,1] };
+      const geneLabels = {
+        wheel:'Радиус колёс',base:'Колёсная база',motor:'Тяга',spring:'Жёсткость пружин',damp:'Демпфирование',travel:'Ход подвески',height:'Клиренс',
+        grip:'Сцепление',frame:'Прочность рамы',mass:'Масса',comY:'Центр масс ↓',comX:'Баланс →',control:'Анти-переворот',drive:'Тип привода',
+        hue:'Цвет',shape:'Форма кузова',cabin:'Кабина',nose:'Нос кузова',style:'Стиль машины',lights:'Количество фар',lightLayout:'Расположение фар',
+        lightShape:'Форма фар',horns:'Количество рогов',hornSize:'Размер рогов',pattern:'Рисунок',spoiler:'Размер спойлера',spoilerStyle:'Вид спойлера'
+      };
+      const physicalGeneKeys = ['wheel','base','motor','spring','damp','travel','height','grip','frame','mass','comY','comX','control','drive'];
+      let comparisonCar=null,comparisonRecord=null;
       const isTracked = g => g.drive >= .52;
       const genomeColor = g => `hsl(${Math.round(g.hue*360)} 72% ${42+Math.round(g.shape*9)}%)`;
       const archetypeName = g => ['Багги','Джип','Вездеход'][Math.min(2,Math.floor(g.style*3))];
+      function geneValue(k,g){
+        const v=g[k];
+        if(k==='drive')return `${isTracked(g)?'гус.':'кол.'} · ${v.toFixed(2)}`;
+        if(k==='style')return `${archetypeName(g)} · ${v.toFixed(2)}`;
+        if(k==='hue')return `${Math.round(v*360)}°`;
+        if(['wheel','base','travel','height','comY','comX'].includes(k))return `${v.toFixed(1)} см`;
+        if(k==='mass')return `${v.toFixed(2)} т`;
+        return v.toFixed(2);
+      }
+      function updateGenomeComparison(force=false){
+        const car=activeCar();if(!car)return;
+        if(!force&&comparisonCar===car&&comparisonRecord===carryGhost)return;
+        comparisonCar=car;comparisonRecord=carryGhost;const champion=carryGhost?.genome;
+        ui.leaderId.textContent='#'+String(car.id).padStart(2,'0');ui.driveType.textContent=`${archetypeName(car.g)} · ${isTracked(car.g)?'гусеницы':'колёса'}`;
+        ui.driveType.style.background=car.color;ui.driveType.style.color='white';
+        ui.comparisonChampion.textContent=carryGhost?`Абсолютный чемпион: G${carryGhost.generation} / #${String(carryGhost.id).padStart(2,'0')} · ${(carryGhost.meters??Math.max(0,(carryGhost.trace.reduce((m,p)=>Math.max(m,p.x),START_X)-START_X)/8)).toFixed(1)} м`:'Нет чемпиона: завершите первое поколение';
+        const rows=keys=>keys.map(k=>{const d=champion?(car.g[k]-champion[k])*(k==='hue'?360:1):null,rounded=d===null?null:Number(d.toFixed(k==='hue'?0:2));
+          return `<tr data-gene="${k}"><td>${geneLabels[k]}</td><td>${geneValue(k,car.g)}</td><td>${champion?geneValue(k,champion):'—'}</td><td>${rounded===null?'—':`${rounded>0?'+':''}${rounded}${k==='hue'?'°':''}`}</td></tr>`;}).join('');
+        ui.physicalGenes.innerHTML=rows(physicalGeneKeys);ui.cosmeticGenes.innerHTML=rows(Object.keys(bounds).filter(k=>!physicalGeneKeys.includes(k)));
+      }
       function crossover(a,b) {
         const g = {};
         Object.keys(bounds).forEach(k => { if(k==='drive')g[k]=rng.next()<.5?a[k]:b[k];else{const mix=rng.between(.18,.82);g[k]=lerp(a[k],b[k],mix);} });
@@ -567,13 +601,16 @@
       }
       function startRun(index) {
         currentIndex=index; const car=cars[currentIndex]; resetCar(car);
-        elapsed=0; cameraX=0; runTrace=[{t:0,x:car.x,y:car.y,angle:0,susp:[0,0,0]}]; nextTraceAt=TRACE_STEP;
+        elapsed=0; cameraX=0; runTrace=[tracePoint(car,0)]; nextTraceAt=TRACE_STEP;
         const trace=carryGhost?.trace;
         raceGhost=trace ? {trace, genome:carryGhost.genome, id:carryGhost.id,generation:carryGhost.generation} : null;
         phase='racing'; phaseTimer=0; ui.next.disabled=false; ui.statusText.textContent=`заезд #${String(car.id).padStart(2,'0')}`;
         ui.outcomeBanner.classList.remove('show','success','neutral');
         ui.statusDot.classList.toggle('paused',paused); showToast(index===0 ? `Поколение ${generation}: первый заезд` : `На трассе машина #${String(car.id).padStart(2,'0')}`);
+        updateGenomeComparison(true);
       }
+
+      function tracePoint(car,time){return {t:time,x:car.x,y:car.y-groundBase,angle:car.angle,susp:[...car.susp]};}
 
       function suspensionY(g){return g.height*.48+g.travel*.24;}
       function applyWheel(car, localX, dt, driveShare) {
@@ -645,7 +682,7 @@
         if(!car.outcome)car.outcome=manual?'manual':elapsed>=RUN_TIME?'timeout':car.finished?'finish':'stopped';
         car.alive=false; car.completed=true;
         car.score=(car.bestX-START_X)+(car.finished?2500:0)-Math.abs(car.angle)*5;
-        runTrace.push({t:elapsed,x:car.x,y:car.y,angle:car.angle,susp:[...car.susp]});
+        runTrace.push(tracePoint(car,elapsed));
         const best=cars.filter(c=>c.completed).sort((a,b)=>b.score-a.score)[0];
         if(best===car){generationGhost=runTrace.map(p=>({...p}));generationGhostGenome={...car.g};generationGhostId=car.id;}
         updateMiniBoard(); phase='between';phaseTimer=manual ? 1.2 : 2.5;ui.next.disabled=true;
@@ -676,11 +713,11 @@
         phase='results'; const sorted=sortedResults(), best=sorted[0], bestMeters=meters(best);
         if(!restoring){
           history.push(bestMeters);record=Math.max(record,bestMeters);
-          if(!carryGhost||best.score>carryGhost.score)carryGhost={trace:generationGhost.map(p=>({...p,susp:[...(p.susp||[0,0,0])]})),genome:{...generationGhostGenome},id:generationGhostId,generation,score:best.score};
+          if(!carryGhost||best.score>carryGhost.score)carryGhost={trace:generationGhost.map(p=>({...p,susp:[...(p.susp||[0,0,0])]})),genome:{...generationGhostGenome},id:generationGhostId,generation,score:best.score,meters:bestMeters};
           champions.unshift({generation,id:best.id,g:{...best.g},meters:bestMeters,bestX:best.bestX,outcome:best.outcome,finished:best.finished});
           champions=champions.slice(0,10);
         }
-        updateChart();renderChampions();
+        updateChart();renderChampions();updateGenomeComparison(true);
         ui.resultsGeneration.textContent=String(generation).padStart(2,'0');ui.resultsBest.textContent=`${bestMeters.toFixed(1)} м`;
         ui.resultsRows.innerHTML=sorted.slice(0,5).map((c,i)=>`<tr><td>${i+1}</td><td><span class="car-chip" style="--chip:${c.color}"><i></i>#${String(c.id).padStart(2,'0')}</span></td><td>${isTracked(c.g)?'гусеницы':'колёса'}</td><td>${outcomeInfo(c.outcome).short}</td><td class="fitness">${meters(c).toFixed(1)} м</td></tr>`).join('');
         phaseTimer=5;ui.showBreeding.textContent='Показать селекцию → · 5';openOverlay(ui.resultsOverlay);ui.statusText.textContent='итоги поколения';ui.next.disabled=true;
@@ -770,30 +807,23 @@
           const steps=Math.max(1,Math.round(speed));
           for(let i=0;i<steps&&phase==='racing';i++){
             physics(car,fixed);elapsed+=fixed;
-            if(elapsed>=nextTraceAt){runTrace.push({t:elapsed,x:car.x,y:car.y,angle:car.angle,susp:[...car.susp]});nextTraceAt+=TRACE_STEP;}
+            if(elapsed>=nextTraceAt){runTrace.push(tracePoint(car,elapsed));nextTraceAt+=TRACE_STEP;}
             if(elapsed>=RUN_TIME||!car.alive)finishRun();
           }
         }
         if(!car)return;const target=Math.max(0,car.x-W*.38);cameraX=lerp(cameraX,target,1-Math.pow(.0008,dt));
         ui.generation.textContent=String(generation).padStart(2,'0');ui.distance.textContent=meters(car).toFixed(1);
         ui.alive.textContent=`${currentIndex+1} / ${cars.length}`;ui.timer.textContent=`${Math.max(0,RUN_TIME-elapsed).toFixed(1)} с`;
-        ui.leaderId.textContent='#'+String(car.id).padStart(2,'0');
-        const vals=[(car.g.wheel-12)/15,(car.g.base-42)/42,(car.g.motor-22)/40,(car.g.spring-38)/54];
-        vals.forEach((v,i)=>ui.genes[i].style.width=`${clamp(v,0,1)*100}%`);
-        ui.driveType.textContent=`${archetypeName(car.g)} · ${isTracked(car.g)?'гусеницы':'колёса'}`;
-        ui.driveType.style.background=car.color;ui.driveType.style.color='white';
-        ui.geneWheel.textContent=`${car.g.wheel.toFixed(1)} см`;ui.geneBase.textContent=`${car.g.base.toFixed(0)} см`;
-        ui.geneMotor.textContent=car.g.motor.toFixed(1);ui.geneSpring.textContent=car.g.spring.toFixed(0);
-        ui.geneTravel.textContent=`${car.g.travel.toFixed(1)} см`;ui.geneHeight.textContent=`${car.g.height.toFixed(1)} см`;
-        ui.geneGrip.textContent=car.g.grip.toFixed(2);ui.geneFrame.textContent=car.g.frame.toFixed(2);ui.geneMass.textContent=car.g.mass.toFixed(2);
-        ui.geneComY.textContent=`${car.g.comY>=0?'↓':'↑'} ${Math.abs(car.g.comY).toFixed(1)}`;
-        ui.geneComX.textContent=`${car.g.comX>=0?'→':'←'} ${Math.abs(car.g.comX).toFixed(1)}`;ui.geneControl.textContent=car.g.control.toFixed(2);
+        updateGenomeComparison();
       }
 
       function resize() {
+        const previousBase=groundBase;
         dpr=Math.min(window.devicePixelRatio||1,2); const rect=canvas.getBoundingClientRect(); W=rect.width; H=rect.height;
         canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); ctx.setTransform(dpr,0,0,dpr,0,0);
         groundBase=H*.66;
+        // Traces are terrain-relative; only live body coordinates need moving.
+        const dy=groundBase-previousBase;cars.forEach(car=>car.y+=dy);
       }
 
       function sky() {
@@ -906,13 +936,29 @@
         c.save();c.translate(w*.5,h*.5);c.scale(scale,scale);paintVehicle(c,g,0,genomeColor(g),[0,0,0],0,false);c.restore();
       }
       function ghostAt(time){
-        if(!raceGhost?.trace?.length)return null;const trace=raceGhost.trace,idx=clamp(Math.floor(time/TRACE_STEP),0,trace.length-1),p=trace[idx];
-        return {...p,g:raceGhost.genome,id:raceGhost.id};
+        if(!raceGhost?.trace?.length)return null;
+        const trace=raceGhost.trace;let low=0,high=trace.length-1;
+        while(low<high){const mid=Math.ceil((low+high)/2);if(trace[mid].t<=time)low=mid;else high=mid-1;}
+        const a=trace[low],b=trace[Math.min(low+1,trace.length-1)],mix=b.t>a.t?clamp((time-a.t)/(b.t-a.t),0,1):0;
+        const turn=Math.atan2(Math.sin(b.angle-a.angle),Math.cos(b.angle-a.angle));
+        return {t:time,x:lerp(a.x,b.x,mix),y:groundBase+lerp(a.y,b.y,mix),angle:a.angle+turn*mix,
+          susp:[0,1,2].map(i=>lerp(a.susp?.[i]||0,b.susp?.[i]||0,mix)),g:raceGhost.genome,id:raceGhost.id};
+      }
+      function drawGhostOutline(car){
+        const x=car.x-cameraX;if(x<-130||x>W+130)return;
+        const g=car.g,s=car.susp,b=g.base,h=g.height*(.7+g.mass*.15),rest=suspensionY(g),r=g.wheel;
+        ctx.save();ctx.translate(x,car.y);ctx.rotate(car.angle);ctx.strokeStyle='#bcf4ff';ctx.lineWidth=2;
+        ctx.shadowColor='#72d6e7';ctx.shadowBlur=7;ctx.setLineDash([5,3]);
+        bodyPath(ctx,g,b,h,(s[2]-s[0])*g.travel*.18);ctx.stroke();
+        const wheels=isTracked(g)?[-b*.5,0,b*.5]:[-b*.5,b*.5];
+        wheels.forEach(lx=>{const i=lx<0?0:lx>0?2:1;ctx.beginPath();ctx.arc(lx,rest-s[i]*g.travel*.42,r+2,0,Math.PI*2);ctx.stroke();});
+        ctx.restore();
       }
       function draw() {
         ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);sky();drawTerrain();drawCourseZones();
         const car=activeCar(),ghost=ghostAt(elapsed);if(ghost)drawCar(ghost,'ghost');if(car)drawCar(car,'active');
-        if(ghost&&car){const x=ghost.x-cameraX,y=ghost.y-ghost.g.height-40,diff=(ghost.x-car.x)/8;ctx.fillStyle='rgba(238,246,231,.22)';roundRect(x-57,y-13,114,21,10);ctx.fill();ctx.strokeStyle='rgba(238,246,231,.6)';ctx.stroke();ctx.fillStyle='white';ctx.font='600 8px ui-monospace,monospace';ctx.textAlign='center';ctx.fillText(`РЕКОРД G${raceGhost.generation||'?'} · ${diff>=0?'+':''}${diff.toFixed(1)} м`,x,y+1);}
+        if(ghost)drawGhostOutline(ghost);
+        if(ghost&&car){const x=ghost.x-cameraX,y=ghost.y-ghost.g.height-68,diff=(ghost.x-car.x)/8;ctx.fillStyle='rgba(21,49,53,.8)';roundRect(x-57,y-13,114,21,10);ctx.fill();ctx.strokeStyle='#bcf4ff';ctx.stroke();ctx.fillStyle='#d5f8ff';ctx.font='600 8px ui-monospace,monospace';ctx.textAlign='center';ctx.fillText(`РЕКОРД G${raceGhost.generation||'?'} · ${diff>=0?'+':''}${diff.toFixed(1)} м`,x,y+1);}
         if(car){const x=car.x-cameraX,y=car.y-car.g.height-39;ctx.fillStyle='rgba(20,25,17,.82)';roundRect(x-28,y-12,56,20,10);ctx.fill();ctx.fillStyle='#d7f23d';ctx.font='700 9px ui-monospace,monospace';ctx.textAlign='center';ctx.fillText(`МАШИНА ${String(car.id).padStart(2,'0')}`,x,y+1);}
       }
       function updateChart(){
@@ -925,7 +971,7 @@
 
       function saveExperiment(){
         if(awaitingResume)return false;
-        const state={version:1,savedAt:Date.now(),generation,elapsed,paused,phase:phase==='archive'?phaseBeforeArchive:phase,
+        const state={version:2,traceSpace:'terrain-relative',savedAt:Date.now(),generation,elapsed,paused,phase:phase==='archive'?phaseBeforeArchive:phase,
           cars,history,populationSize,mutationRate,terrainVersion:2,record,currentIndex,phaseTimer,cameraX,groundBase,
           runTrace,nextTraceAt,raceGhost,carryGhost,generationGhost,generationGhostGenome,generationGhostId,
           breedingPlan,breedIndex,breedClock,champions,archiveLimit,seed:rng.seed,speed:+ui.speed.value};
@@ -936,7 +982,7 @@
         const finite=Number.isFinite,genome=g=>g&&Object.entries(bounds).every(([k,[lo,hi]])=>finite(g[k])&&g[k]>=lo&&g[k]<=hi);
         const trace=t=>Array.isArray(t)&&t.length<=10000&&t.every(p=>p&&['t','x','y','angle'].every(k=>finite(p[k]))&&(!p.susp||(Array.isArray(p.susp)&&p.susp.length===3&&p.susp.every(finite))));
         const carId=id=>Number.isInteger(id)&&id>=1&&id<=24;
-        return s&&s.version===1&&s.terrainVersion===2&&Number.isInteger(s.generation)&&s.generation>=1&&
+        return s&&[1,2].includes(s.version)&&(s.version===1||s.traceSpace==='terrain-relative')&&s.terrainVersion===2&&Number.isInteger(s.generation)&&s.generation>=1&&
           Number.isInteger(s.populationSize)&&s.populationSize>=6&&s.populationSize<=24&&Array.isArray(s.cars)&&s.cars.length===s.populationSize&&
           s.cars.every(c=>c&&carId(c.id)&&genome(c.g)&&['x','y','vx','vy','angle','av','bestX','score','still','wheelDamage','frameDamage'].every(k=>finite(c[k]))&&Array.isArray(c.susp)&&c.susp.length===3&&c.susp.every(finite))&&
           Number.isInteger(s.currentIndex)&&s.currentIndex>=0&&s.currentIndex<s.cars.length&&finite(s.elapsed)&&s.elapsed>=0&&s.elapsed<=RUN_TIME+.1&&finite(s.phaseTimer)&&finite(s.seed)&&finite(s.groundBase)&&finite(s.record)&&finite(s.savedAt)&&finite(s.cameraX)&&finite(s.nextTraceAt)&&finite(s.mutationRate)&&s.mutationRate>=.02&&s.mutationRate<=.35&&
@@ -953,20 +999,28 @@
       }
       function restoreExperiment(){
         const s=savedExperiment;if(!s)return;awaitingResume=false;closeOverlay($('resumeOverlay'));
+        if(s.version===1){
+          const converted=new Set();[s.runTrace,s.raceGhost?.trace,s.carryGhost?.trace,s.generationGhost].forEach(trace=>{
+            if(!trace||converted.has(trace))return;converted.add(trace);
+            // The first sample is at START_X, 45 px above the flat start: recover each recording's own origin.
+            const origin=trace[0]?.t===0?trace[0].y+45:s.groundBase;trace.forEach(p=>p.y-=origin);
+          });s.version=2;s.traceSpace='terrain-relative';
+        }
         generation=s.generation;elapsed=s.elapsed;paused=s.paused;phase=s.phase;cars=s.cars;history=s.history;
         populationSize=s.populationSize;mutationRate=s.mutationRate;record=s.record;currentIndex=s.currentIndex;phaseTimer=s.phaseTimer;cameraX=s.cameraX;
         runTrace=s.runTrace;nextTraceAt=s.nextTraceAt;raceGhost=s.raceGhost;carryGhost=s.carryGhost;
         generationGhost=s.generationGhost;generationGhostGenome=s.generationGhostGenome;generationGhostId=s.generationGhostId;
         breedingPlan=s.breedingPlan;breedIndex=s.breedIndex;breedClock=s.breedClock;champions=s.champions;archiveLimit=s.archiveLimit;rng.seed=s.seed;
         const dy=groundBase-s.groundBase;cars.forEach(c=>c.y+=dy);
-        const shifted=new Set();[runTrace,raceGhost?.trace,carryGhost?.trace,generationGhost].forEach(t=>{if(t&&!shifted.has(t)){shifted.add(t);t.forEach(p=>p.y+=dy);}});
+        // The replay always uses the all-time champion, including the first car of a restored generation.
+        raceGhost=carryGhost?.trace?.length?{trace:carryGhost.trace,genome:carryGhost.genome,id:carryGhost.id,generation:carryGhost.generation}:null;
         ui.population.value=populationSize;ui.populationOut.textContent=populationSize;ui.mutation.value=Math.round(mutationRate*100);ui.mutationOut.textContent=`${Math.round(mutationRate*100)}%`;ui.speed.value=[1,2,4,8,16].includes(s.speed)?s.speed:8;
         ui.toggle.textContent=paused?'Продолжить':'Пауза';ui.statusDot.classList.toggle('paused',paused);ui.statusText.textContent=paused?'на паузе':`заезд #${String(activeCar().id).padStart(2,'0')}`;ui.next.disabled=phase!=='racing';
         cars.forEach(c=>c.color=genomeColor(c.g));ui.generation.textContent=String(generation).padStart(2,'0');ui.distance.textContent=meters(activeCar()).toFixed(1);ui.alive.textContent=`${currentIndex+1} / ${cars.length}`;ui.timer.textContent=`${Math.max(0,RUN_TIME-elapsed).toFixed(1)} с`;
         if(phase==='results'){showResults(true);phaseTimer=s.phaseTimer;}
         else if(phase==='breeding'){const count=s.breedIndex;beginBreeding(true);for(let i=0;i<count;i++)revealOffspring();phaseTimer=s.phaseTimer;breedClock=s.breedClock;}
         else if(phase==='between')showOutcome(activeCar(),outcomeInfo(activeCar().outcome));
-        document.querySelectorAll('[data-limit]').forEach(b=>b.classList.toggle('active',+b.dataset.limit===archiveLimit));renderChampions();updateMiniBoard();updateChart();last=performance.now();saveExperiment();showToast('Эксперимент восстановлен');
+        document.querySelectorAll('[data-limit]').forEach(b=>b.classList.toggle('active',+b.dataset.limit===archiveLimit));renderChampions();updateMiniBoard();updateChart();updateGenomeComparison(true);last=performance.now();saveExperiment();showToast('Эксперимент восстановлен');
       }
 
       ui.toggle.addEventListener('click',()=>{if(!['racing','between'].includes(phase))return;paused=!paused;ui.toggle.textContent=paused?'Продолжить':'Пауза';ui.statusText.textContent=paused?'на паузе':`заезд #${String(activeCar().id).padStart(2,'0')}`;ui.statusDot.classList.toggle('paused',paused);});
