@@ -549,7 +549,7 @@
         if(k==='drive')return `${isTracked(g)?'гус.':'кол.'} · ${v.toFixed(2)}`;
         if(k==='style')return `${archetypeName(g)} · ${v.toFixed(2)}`;
         if(k==='hue')return `${Math.round(v*360)}°`;
-        if(['wheel','base','travel','height','comY','comX'].includes(k))return `${v.toFixed(1)} см`;
+        if(['wheel','base','travel','height','comY','comX'].includes(k))return `${v.toFixed(2)} см`;
         if(k==='mass')return `${v.toFixed(2)} т`;
         return v.toFixed(2);
       }
@@ -980,7 +980,7 @@
       }
       function validExperiment(s){
         const finite=Number.isFinite,genome=g=>g&&Object.entries(bounds).every(([k,[lo,hi]])=>finite(g[k])&&g[k]>=lo&&g[k]<=hi);
-        const trace=t=>Array.isArray(t)&&t.length<=10000&&t.every(p=>p&&['t','x','y','angle'].every(k=>finite(p[k]))&&(!p.susp||(Array.isArray(p.susp)&&p.susp.length===3&&p.susp.every(finite))));
+        const trace=t=>Array.isArray(t)&&t.length<=10000&&t.every((p,i)=>p&&['t','x','y','angle'].every(k=>finite(p[k]))&&p.t>=0&&(!i||p.t>=t[i-1].t)&&(!p.susp||(Array.isArray(p.susp)&&p.susp.length===3&&p.susp.every(finite))));
         const carId=id=>Number.isInteger(id)&&id>=1&&id<=24;
         return s&&[1,2].includes(s.version)&&(s.version===1||s.traceSpace==='terrain-relative')&&s.terrainVersion===2&&Number.isInteger(s.generation)&&s.generation>=1&&
           Number.isInteger(s.populationSize)&&s.populationSize>=6&&s.populationSize<=24&&Array.isArray(s.cars)&&s.cars.length===s.populationSize&&
@@ -988,7 +988,7 @@
           Number.isInteger(s.currentIndex)&&s.currentIndex>=0&&s.currentIndex<s.cars.length&&finite(s.elapsed)&&s.elapsed>=0&&s.elapsed<=RUN_TIME+.1&&finite(s.phaseTimer)&&finite(s.seed)&&finite(s.groundBase)&&finite(s.record)&&finite(s.savedAt)&&finite(s.cameraX)&&finite(s.nextTraceAt)&&finite(s.mutationRate)&&s.mutationRate>=.02&&s.mutationRate<=.35&&
           ['racing','between','results','breeding'].includes(s.phase)&&trace(s.runTrace)&&Array.isArray(s.history)&&s.history.every(finite)&&
           Array.isArray(s.champions)&&s.champions.length<=10&&s.champions.every(c=>genome(c.g)&&carId(c.id)&&Number.isInteger(c.generation)&&c.generation>=1&&finite(c.meters)&&finite(c.bestX))&&Array.isArray(s.breedingPlan)&&s.breedingPlan.length<=s.populationSize&&s.breedingPlan.every(p=>genome(p.genome)&&['elite','child'].includes(p.type)&&Number.isInteger(p.mutations)&&p.mutations>=0&&Array.isArray(p.parents)&&p.parents.length===(p.type==='elite'?1:2)&&p.parents.every(c=>genome(c.g)&&carId(c.id)&&finite(c.bestX)))&&Number.isInteger(s.breedIndex)&&s.breedIndex>=0&&s.breedIndex<=s.breedingPlan.length&&finite(s.breedClock)&&[5,10].includes(s.archiveLimit)&&
-          (!s.carryGhost||(genome(s.carryGhost.genome)&&trace(s.carryGhost.trace)&&finite(s.carryGhost.score)))&&
+          (!s.carryGhost||(genome(s.carryGhost.genome)&&trace(s.carryGhost.trace)&&finite(s.carryGhost.score)&&carId(s.carryGhost.id)&&Number.isInteger(s.carryGhost.generation)&&s.carryGhost.generation>=1&&(s.carryGhost.meters===undefined||finite(s.carryGhost.meters))))&&
           (!s.raceGhost||(genome(s.raceGhost.genome)&&trace(s.raceGhost.trace)))&&(!s.generationGhost||trace(s.generationGhost));
       }
       function offerSavedExperiment(){
