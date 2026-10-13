@@ -130,6 +130,17 @@
     .comparison-table td:nth-child(3) { color: #c4e5ed; }
     .comparison-table td:last-child { color: rgba(255,255,255,.64); font: 9px ui-monospace, monospace; }
     .comparison-note { margin: 7px 0 0; font-size: 9px; line-height: 1.4; color: rgba(255,255,255,.48); }
+    .gene-report-card { width: min(1120px, 100%); }
+    .gene-report-head { position: sticky; top: 0; z-index: 2; background: #f4f3eb; gap: 16px; flex-wrap: wrap; }
+    .gene-report-head .btn { flex-shrink: 0; }
+    .gene-report-note { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 18px; }
+    .gene-report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; }
+    .gene-plot { min-width: 0; border-top: 1px solid var(--line); padding-top: 10px; }
+    .gene-plot-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+    .gene-plot h3 { font-size: 12px; margin: 0; }
+    .gene-plot-head span { font: 11px ui-monospace, monospace; color: var(--acid-dark); }
+    .gene-plot svg { display: block; width: 100%; height: auto; }
+    .gene-plot p { font-size: 10px; color: var(--muted); line-height: 1.5; margin: 0 0 5px; }
     .mini-board { margin-top: 11px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 8px; display: grid; gap: 4px; }
     .mini-row { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 7px; font: 10px/1.4 ui-monospace, monospace; }
     .mini-row .rank { color: rgba(255,255,255,.38); }
@@ -336,6 +347,7 @@
         </div>
         <p class="comparison-note">Δ = машина − чемпион. Больше не всегда лучше. Декоративные гены не влияют на физику.</p>
       </details>
+      <button class="save-button" id="openEvolutionReport">Графики генов чемпионов ↗</button>
       <div class="mini-board" id="miniBoard"><div class="mini-empty">Рейтинг появится после первого заезда</div></div>
     </section>
     <aside class="champ-dock" aria-label="Краткий список чемпионов">
@@ -432,6 +444,12 @@
         </div>
       </div>
     </section>
+    <section class="phase-overlay" id="evolutionOverlay" aria-label="Отчёт об эволюции генов" aria-hidden="true">
+      <div class="phase-card gene-report-card">
+        <div class="phase-top gene-report-head"><div><div class="phase-kicker" id="evolutionKicker">Чемпионы поколений</div><h2>Как менялся геном</h2></div><button class="btn primary" id="closeEvolutionReport">Продолжить заезды →</button></div>
+        <div class="phase-body"><p class="gene-report-note" id="evolutionSummary"></p><div class="gene-report-grid" id="evolutionPlots"></div></div>
+      </div>
+    </section>
     <div class="toast" id="toast" role="status"></div>
   </main>
 
@@ -472,7 +490,8 @@
       ];
       let runTrace = [], nextTraceAt = 0, raceGhost = null, carryGhost = null, generationGhost = null;
       let generationGhostGenome = null, generationGhostId = null, breedingPlan = [], breedIndex = 0, breedClock = 0;
-      let champions = [], archiveLimit = 5, phaseBeforeArchive = 'racing';
+      let champions = [], championHistory = [], archiveLimit = 5, phaseBeforeArchive = 'racing', phaseBeforeReport='racing';
+      let particles=[],stoneCredit=0,smokeCredit=0,passedZones=new Set(),sectionPulse=null,finishReportSeen=false;
       const SAVE_KEY='genodrive:experiment:v1';
       let savedExperiment=null,saveClock=0,awaitingResume=false;
 
@@ -482,6 +501,9 @@
         between(a,b) { return a + (b-a) * this.next(); }
       }
       const rng = new RNG(870221);
+      // Visual effects have their own stream and cannot alter genetic selection.
+      const effectsRng = new RNG(481913);
+      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches || false;
       const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
       const lerp = (a,b,t) => a + (b-a)*t;
 
@@ -585,7 +607,7 @@
         return {
           g: {...genome}, id: index+1, x: START_X, y: groundY(START_X)-45, vx: 0, vy: 0,
           angle: 0, av: 0, alive: true, finished: false, bestX: START_X, still: 0, contacts: 0,
-          color: genomeColor(genome), score: 0, completed: false, wheelDamage: 0, frameDamage: 0, outcome: '', susp:[0,0,0]
+          color: genomeColor(genome), score: 0, completed: false, wheelDamage: 0, frameDamage: 0, outcome: '', raceTime:0, susp:[0,0,0]
         };
       }
       function startPopulation(genomes) {
@@ -597,7 +619,7 @@
       }
       function resetCar(car) {
         Object.assign(car,{x:START_X,y:groundY(START_X)-45,vx:0,vy:0,angle:0,av:0,alive:true,
-          finished:false,bestX:START_X,still:0,contacts:0,score:0,completed:false,wheelDamage:0,frameDamage:0,outcome:'',susp:[0,0,0]});
+          finished:false,bestX:START_X,still:0,contacts:0,score:0,completed:false,wheelDamage:0,frameDamage:0,outcome:'',raceTime:0,susp:[0,0,0]});
       }
       function startRun(index) {
         currentIndex=index; const car=cars[currentIndex]; resetCar(car);
@@ -607,10 +629,73 @@
         phase='racing'; phaseTimer=0; ui.next.disabled=false; ui.statusText.textContent=`заезд #${String(car.id).padStart(2,'0')}`;
         ui.outcomeBanner.classList.remove('show','success','neutral');
         ui.statusDot.classList.toggle('paused',paused); showToast(index===0 ? `Поколение ${generation}: первый заезд` : `На трассе машина #${String(car.id).padStart(2,'0')}`);
+        resetRunEffects();
         updateGenomeComparison(true);
       }
 
       function tracePoint(car,time){return {t:time,x:car.x,y:car.y-groundBase,angle:car.angle,susp:[...car.susp]};}
+
+      function resetRunEffects(keepReport=false){
+        particles=[];stoneCredit=0;smokeCredit=0;sectionPulse=null;
+        passedZones=new Set(courseZones.filter(z=>z.x<=activeCar().bestX).map(z=>z.x));
+        if(!keepReport)finishReportSeen=false;
+      }
+      function vehiclePoint(car,x,y){
+        const c=Math.cos(car.angle),s=Math.sin(car.angle);
+        return {x:car.x+x*c-y*s,y:car.y-groundBase+x*s+y*c};
+      }
+      function addParticle(p){if(particles.length<240)particles.push({...p,maxLife:p.life});}
+      function celebrateFinish(){
+        if(reducedMotion)return;
+        for(let burst=0;burst<3;burst++){
+          const x=WORLD_END+effectsRng.between(-100,110),y=terrainValue(WORLD_END)-effectsRng.between(110,230);
+          for(let i=0;i<42;i++){
+            const angle=i/42*Math.PI*2+effectsRng.between(-.08,.08),speed=effectsRng.between(36,110);
+            addParticle({kind:'spark',x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:effectsRng.between(1.5,3),size:effectsRng.between(1.4,2.6),color:palette[(burst+i)%palette.length],gravity:30});
+          }
+        }
+      }
+      function updateEffects(dt){
+        if(dt<=0||awaitingResume||paused||['archive','report'].includes(phase))return;
+        if(sectionPulse){sectionPulse.life-=dt;if(sectionPulse.life<=0)sectionPulse=null;}
+        particles=particles.filter(p=>{
+          p.life-=dt;if(p.life<=0)return false;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=(p.gravity||0)*dt;
+          if(p.kind==='smoke')p.size+=10*dt;
+          if(p.kind==='stone'&&p.y>=terrainValue(p.x)){p.y=terrainValue(p.x);p.vy*=-.25;p.vx*=.6;p.life=Math.min(p.life,.2);}
+          return true;
+        });
+        const car=activeCar();if(!car)return;
+        if(['racing','between'].includes(phase))courseZones.forEach((z,i)=>{
+          if(car.bestX>=z.x&&!passedZones.has(z.x)){passedZones.add(z.x);sectionPulse={name:z.name,index:i+1,life:1.7};}
+        });
+        if(phase!=='racing'||!car.alive||reducedMotion)return;
+        const g=car.g,speed=Math.abs(car.vx),rough=Math.abs(terrainSlope(car.x)),load=Math.max(...car.susp);
+        if(car.contacts&&speed>8&&(rough>.13||load>.3)){
+          stoneCredit+=Math.min(38,6+speed*.17+rough*10)*dt;
+          while(stoneCredit>=1){stoneCredit--;
+            const side=effectsRng.next()<.5?-1:1,contact=vehiclePoint(car,side*g.base*.5,suspensionY(g));
+            addParticle({kind:'stone',x:contact.x,y:terrainValue(contact.x)-2,vx:car.vx*.15-effectsRng.between(18,52),vy:-effectsRng.between(16,55),life:effectsRng.between(.5,.95),size:effectsRng.between(1.4,3),color:'#aaa78a',gravity:130});
+          }
+        }else stoneCredit=0;
+        smokeCredit+=(5+g.motor*.09)*dt;
+        while(smokeCredit>=1){smokeCredit--;
+          const height=g.height*(.7+g.mass*.15),p=vehiclePoint(car,-g.base*.65,-height*.1);
+          addParticle({kind:'smoke',...p,vx:car.vx*.08-effectsRng.between(12,25),vy:-effectsRng.between(7,16),life:effectsRng.between(.9,1.5),size:effectsRng.between(2,4),color:'#dedbd0',gravity:-3});
+        }
+      }
+      function drawEffects(){
+        ctx.save();
+        particles.forEach(p=>{
+          const x=p.x-cameraX,y=groundBase+p.y;if(x<-60||x>W+60)return;
+          ctx.globalAlpha=(p.life/p.maxLife)*(p.kind==='smoke'?.24:1);ctx.fillStyle=p.color;ctx.strokeStyle=p.color;
+          if(p.kind==='spark'){ctx.lineWidth=p.size;ctx.beginPath();ctx.moveTo(x-p.vx*.028,y-p.vy*.028);ctx.lineTo(x,y);ctx.stroke();}
+          else{ctx.beginPath();ctx.arc(x,y,p.size,0,Math.PI*2);ctx.fill();}
+        });ctx.restore();
+        if(sectionPulse){
+          const width=Math.min(330,W-32),x=(W-width)/2,y=Math.max(112,H*.21);ctx.save();ctx.globalAlpha=Math.min(1,sectionPulse.life*2);
+          ctx.fillStyle='rgba(23,31,22,.76)';roundRect(x,y,width,32,12);ctx.fill();ctx.fillStyle='#d7f23d';ctx.font='600 11px system-ui';ctx.textAlign='center';ctx.fillText(`СЕКЦИЯ ${sectionPulse.index} · ${sectionPulse.name}`,W*.5,y+21);ctx.restore();
+        }
+      }
 
       function suspensionY(g){return g.height*.48+g.travel*.24;}
       function applyWheel(car, localX, dt, driveShare) {
@@ -680,12 +765,13 @@
         if(phase!=='racing') return;
         const car=cars[currentIndex];
         if(!car.outcome)car.outcome=manual?'manual':elapsed>=RUN_TIME?'timeout':car.finished?'finish':'stopped';
-        car.alive=false; car.completed=true;
+        car.alive=false; car.completed=true;car.raceTime=elapsed;
         car.score=(car.bestX-START_X)+(car.finished?2500:0)-Math.abs(car.angle)*5;
         runTrace.push(tracePoint(car,elapsed));
         const best=cars.filter(c=>c.completed).sort((a,b)=>b.score-a.score)[0];
         if(best===car){generationGhost=runTrace.map(p=>({...p}));generationGhostGenome={...car.g};generationGhostId=car.id;}
-        updateMiniBoard(); phase='between';phaseTimer=manual ? 1.2 : 2.5;ui.next.disabled=true;
+        updateMiniBoard(); phase='between';phaseTimer=car.finished?4.5:manual ? 1.2 : 2.5;ui.next.disabled=true;
+        if(car.finished)celebrateFinish();
         const outcome=outcomeInfo(car.outcome);ui.statusText.textContent=outcome.short;showOutcome(car,outcome);
       }
       function rankOf(car) { return cars.filter(c=>c.completed).sort((a,b)=>b.score-a.score).indexOf(car)+1; }
@@ -714,7 +800,7 @@
         if(!restoring){
           history.push(bestMeters);record=Math.max(record,bestMeters);
           if(!carryGhost||best.score>carryGhost.score)carryGhost={trace:generationGhost.map(p=>({...p,susp:[...(p.susp||[0,0,0])]})),genome:{...generationGhostGenome},id:generationGhostId,generation,score:best.score,meters:bestMeters};
-          champions.unshift({generation,id:best.id,g:{...best.g},meters:bestMeters,bestX:best.bestX,outcome:best.outcome,finished:best.finished});
+          const champion=championRecord(best);champions.unshift(champion);championHistory.push(champion);
           champions=champions.slice(0,10);
         }
         updateChart();renderChampions();updateGenomeComparison(true);
@@ -734,8 +820,54 @@
         const dockRecords=champions.slice(0,3);ui.champDockRows.innerHTML=dockRecords.length?dockRecords.map((r,i)=>`<div class="dock-row"><canvas data-dock-thumb="${i}" width="68" height="44"></canvas><div><b>G${String(r.generation).padStart(2,'0')}</b><span>машина #${String(r.id).padStart(2,'0')}</span></div><em>${r.meters.toFixed(1)} м</em></div>`).join(''):'<div class="dock-empty">Завершите первое поколение</div>';
         ui.champDockRows.querySelectorAll('[data-dock-thumb]').forEach((canvas,i)=>drawChampionThumb(canvas,dockRecords[i].g));
       }
-      function openChampions(){if(phase==='archive'||awaitingResume)return;phaseBeforeArchive=phase;phase='archive';renderChampions();openOverlay(ui.championsOverlay);}
+      function openChampions(){if(['archive','report'].includes(phase)||awaitingResume)return;phaseBeforeArchive=phase;phase='archive';renderChampions();openOverlay(ui.championsOverlay);}
       function closeChampions(){closeOverlay(ui.championsOverlay);phase=phaseBeforeArchive;}
+      function championRecord(car){return {generation,id:car.id,g:{...car.g},meters:meters(car),bestX:car.bestX,outcome:car.outcome,finished:car.finished,score:car.score,time:car.raceTime||0};}
+      function evolutionRecords(){
+        const records=championHistory.map(r=>({...r}));
+        const best=cars.filter(c=>c.completed).sort((a,b)=>b.score-a.score)[0];
+        if(best&&!records.some(r=>r.generation===generation))records.push({...championRecord(best),provisional:true});
+        return records.sort((a,b)=>a.generation-b.generation);
+      }
+      function plotSamples(points){
+        if(points.length<=500)return points;
+        const sampled=[points[0]],bucket=Math.ceil(points.length/200);
+        for(let i=1;i<points.length-1;i+=bucket){
+          const group=points.slice(i,Math.min(points.length-1,i+bucket));
+          const low=group.reduce((a,p)=>p.value<a.value?p:a),high=group.reduce((a,p)=>p.value>a.value?p:a);
+          [low,high].sort((a,b)=>a.generation-b.generation).forEach(p=>{if(sampled[sampled.length-1]!==p)sampled.push(p);});
+        }sampled.push(points[points.length-1]);return sampled;
+      }
+      function renderEvolutionReport(){
+        const records=evolutionRecords(),first=records[0],lastRecord=records[records.length-1];
+        $('evolutionKicker').textContent=activeCar()?.finished?`Финиш · поколение ${generation} · машина #${String(activeCar().id).padStart(2,'0')}`:'Чемпионы поколений';
+        if(!records.length){$('evolutionSummary').textContent='История появится после первого завершённого заезда. На каждом графике — один ген чемпиона каждого поколения.';$('evolutionPlots').innerHTML='';return;}
+        const missing=first.generation>1?` Данные генов до G${first.generation} отсутствуют в старом сохранении.`:'';
+        $('evolutionSummary').textContent=`${records.length} чемпионов: G${first.generation}–G${lastRecord.generation}. Ось X — поколение, ось Y — значение гена; вертикальные шкалы индивидуальные. Физические гены показаны зелёным, декоративные — фиолетовым.${missing}${lastRecord.provisional?' Последняя точка — текущий лидер незавершённого поколения, а не окончательный чемпион.':''} Заезды приостановлены до закрытия отчёта.`;
+        $('evolutionPlots').innerHTML=Object.keys(bounds).map(k=>{
+          const factor=k==='hue'?360:1,points=records.map(r=>({generation:r.generation,value:r.g[k]*factor}));
+          let min=Infinity,max=-Infinity;points.forEach(p=>{min=Math.min(min,p.value);max=Math.max(max,p.value);});
+          const padding=Math.max((max-min)*.12,(bounds[k][1]-bounds[k][0])*factor*.015);min-=padding;max+=padding;
+          const x=g=>records.length===1?165:46+(g-first.generation)/(lastRecord.generation-first.generation)*244;
+          const y=v=>113-(v-min)/(max-min)*86,color=physicalGeneKeys.includes(k)?'#607c23':'#8271af';
+          const shown=plotSamples(points),path=shown.map((p,i)=>`${i?'L':'M'}${x(p.generation).toFixed(2)},${y(p.value).toFixed(2)}`).join(' ');
+          const label=v=>k==='hue'?`${Math.round(v)}°`:v.toFixed(2);
+          const ticks=[min,(min+max)/2,max].map(v=>`<line x1="46" y1="${y(v)}" x2="290" y2="${y(v)}" stroke="#dddcd0"/><text x="41" y="${y(v)+4}" text-anchor="end">${label(v)}</text>`).join('');
+          const dots=points.length<=36?points.map(p=>`<circle cx="${x(p.generation)}" cy="${y(p.value)}" r="2.5" fill="${color}"><title>G${p.generation}: ${label(p.value)}</title></circle>`).join(''):'';
+          const last=points[points.length-1],delta=last.value-points[0].value,number=Number(delta.toFixed(k==='hue'?0:2));
+          return `<section class="gene-plot" data-plot-gene="${k}"><div class="gene-plot-head"><h3>${geneLabels[k]}</h3><span>${geneValue(k,lastRecord.g)}</span></div><svg viewBox="0 0 310 150" role="img" aria-label="${geneLabels[k]}: G${first.generation}–G${lastRecord.generation}" style="font:11px ui-monospace,monospace;fill:#6d7163"><title>${geneLabels[k]}: изменение генома чемпионов</title>${ticks}<line x1="46" y1="113" x2="290" y2="113" stroke="#aaa99c"/><path d="${path}" fill="none" stroke="${color}" stroke-width="2.2"/>${dots}<circle cx="${x(last.generation)}" cy="${y(last.value)}" r="3.5" fill="${color}"/><text x="46" y="131">G${first.generation}</text><text x="290" y="131" text-anchor="end">G${lastRecord.generation}</text><text x="168" y="147" text-anchor="middle">Поколение</text></svg><p>${geneValue(k,first.g)} → ${geneValue(k,lastRecord.g)} · Δ ${number>0?'+':''}${number}${k==='hue'?'°':''}${lastRecord.provisional?' · последняя точка предварительная':''}</p></section>`;
+        }).join('');
+      }
+      function openEvolutionReport(atFinish=false){
+        if(awaitingResume||['archive','report'].includes(phase))return;
+        phaseBeforeReport=phase;phase='report';renderEvolutionReport();openOverlay($('evolutionOverlay'));
+        $('evolutionOverlay').scrollTop=0;ui.statusText.textContent=atFinish?'финиш · отчёт эволюции':'отчёт эволюции';
+      }
+      function closeEvolutionReport(){
+        if(phase!=='report')return;closeOverlay($('evolutionOverlay'));phase=phaseBeforeReport;
+        ui.statusText.textContent=phase==='racing'?(paused?'на паузе':`заезд #${String(activeCar().id).padStart(2,'0')}`):phase==='between'?outcomeInfo(activeCar().outcome).short:phase==='results'?'итоги поколения':'синтез геномов';
+        last=performance.now();
+      }
       function sortedResults(){return [...cars].sort((a,b)=>b.score-a.score);}
       function buildBreedingPlan(){
         const sorted=sortedResults(), elite=Math.min(2,populationSize), plan=[];
@@ -781,14 +913,14 @@
       }
 
       function resetAll() {
-        generation=1; history=[]; champions=[];record=0;paused=false;ui.toggle.textContent='Пауза';
+        generation=1; history=[]; champions=[];championHistory=[];record=0;paused=false;ui.toggle.textContent='Пауза';
         carryGhost=null;closeOverlay(ui.resultsOverlay);closeOverlay(ui.breedingOverlay);closeOverlay(ui.championsOverlay);renderChampions();ui.statusDot.classList.remove('paused');
-        awaitingResume=false;savedExperiment=null;closeOverlay($('resumeOverlay'));startPopulation();updateChart();showToast('Эксперимент начат заново');saveExperiment();
+        awaitingResume=false;savedExperiment=null;closeOverlay($('resumeOverlay'));closeOverlay($('evolutionOverlay'));startPopulation();updateChart();showToast('Эксперимент начат заново');saveExperiment();
       }
 
       function activeCar(){return cars[currentIndex];}
       function update(dt) {
-        if(awaitingResume||phase==='archive')return;
+        if(awaitingResume||['archive','report'].includes(phase))return;
         if(phase==='results'){
           phaseTimer-=dt;const seconds=Math.max(0,Math.ceil(phaseTimer));ui.showBreeding.textContent=`Показать селекцию → · ${seconds}`;
           if(phaseTimer<=0)beginBreeding();return;
@@ -799,7 +931,10 @@
           return;
         }
         if(phase==='between'){
-          phaseTimer-=dt;if(phaseTimer<=0){currentIndex+1<cars.length?startRun(currentIndex+1):showResults();}
+          phaseTimer-=dt;if(phaseTimer<=0){
+            if(activeCar().finished&&!finishReportSeen){finishReportSeen=true;openEvolutionReport(true);return;}
+            currentIndex+1<cars.length?startRun(currentIndex+1):showResults();
+          }
           return;
         }
         const speed=+ui.speed.value,fixed=1/60,car=activeCar();
@@ -924,6 +1059,7 @@
         for(let i=0;i<horns;i++){const hx=cx+cw*(horns===1 ? .4 : .2+i*.43);c.beginPath();c.moveTo(hx,cy);c.quadraticCurveTo(hx+(i?1:-1)*hornLen*.5,cy-hornLen*.6,hx+(i?1:-1)*hornLen,cy-hornLen);c.stroke();}
         if(g.spoiler>.2){const sx=-b*.49,sw=9+g.spoiler*13,sy=-h*.75-g.spoilerStyle*5;tube([[sx,-h*.44],[sx-3,sy]],metal,1.5);rr(sx-sw*.68,sy-2,sw,4,1,accent,ink,1.4);}
         if(!ghost){rr(-b*.57,-h*.24,3,5,1,'#ef6254',ink,1);c.fillStyle='#f5eedb';c.beginPath();c.arc(-b*.08,-h*.2,5,0,Math.PI*2);c.fill();c.fillStyle=ink;c.font='700 6px system-ui';c.textAlign='center';c.textBaseline='middle';c.fillText(String(id).padStart(2,'0'),-b*.08,-h*.2);}
+        tube([[-b*.48,-h*.1],[-b*.65,-h*.1]],metal,2.2);
         c.restore();
       }
       function drawCar(car,mode='active'){
@@ -944,21 +1080,11 @@
         return {t:time,x:lerp(a.x,b.x,mix),y:groundBase+lerp(a.y,b.y,mix),angle:a.angle+turn*mix,
           susp:[0,1,2].map(i=>lerp(a.susp?.[i]||0,b.susp?.[i]||0,mix)),g:raceGhost.genome,id:raceGhost.id};
       }
-      function drawGhostOutline(car){
-        const x=car.x-cameraX;if(x<-130||x>W+130)return;
-        const g=car.g,s=car.susp,b=g.base,h=g.height*(.7+g.mass*.15),rest=suspensionY(g),r=g.wheel;
-        ctx.save();ctx.translate(x,car.y);ctx.rotate(car.angle);ctx.strokeStyle='#bcf4ff';ctx.lineWidth=2;
-        ctx.shadowColor='#72d6e7';ctx.shadowBlur=7;ctx.setLineDash([5,3]);
-        bodyPath(ctx,g,b,h,(s[2]-s[0])*g.travel*.18);ctx.stroke();
-        const wheels=isTracked(g)?[-b*.5,0,b*.5]:[-b*.5,b*.5];
-        wheels.forEach(lx=>{const i=lx<0?0:lx>0?2:1;ctx.beginPath();ctx.arc(lx,rest-s[i]*g.travel*.42,r+2,0,Math.PI*2);ctx.stroke();});
-        ctx.restore();
-      }
       function draw() {
         ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);sky();drawTerrain();drawCourseZones();
         const car=activeCar(),ghost=ghostAt(elapsed);if(ghost)drawCar(ghost,'ghost');if(car)drawCar(car,'active');
-        if(ghost)drawGhostOutline(ghost);
-        if(ghost&&car){const x=ghost.x-cameraX,y=ghost.y-ghost.g.height-68,diff=(ghost.x-car.x)/8;ctx.fillStyle='rgba(21,49,53,.8)';roundRect(x-57,y-13,114,21,10);ctx.fill();ctx.strokeStyle='#bcf4ff';ctx.stroke();ctx.fillStyle='#d5f8ff';ctx.font='600 8px ui-monospace,monospace';ctx.textAlign='center';ctx.fillText(`РЕКОРД G${raceGhost.generation||'?'} · ${diff>=0?'+':''}${diff.toFixed(1)} м`,x,y+1);}
+        drawEffects();
+        if(ghost&&car){const x=ghost.x-cameraX,y=ghost.y-ghost.g.height-68,diff=(ghost.x-car.x)/8;ctx.fillStyle='rgba(24,30,22,.7)';roundRect(x-57,y-13,114,21,10);ctx.fill();ctx.fillStyle='rgba(238,246,231,.85)';ctx.font='600 8px ui-monospace,monospace';ctx.textAlign='center';ctx.fillText(`РЕКОРД G${raceGhost.generation||'?'} · ${diff>=0?'+':''}${diff.toFixed(1)} м`,x,y+1);}
         if(car){const x=car.x-cameraX,y=car.y-car.g.height-39;ctx.fillStyle='rgba(20,25,17,.82)';roundRect(x-28,y-12,56,20,10);ctx.fill();ctx.fillStyle='#d7f23d';ctx.font='700 9px ui-monospace,monospace';ctx.textAlign='center';ctx.fillText(`МАШИНА ${String(car.id).padStart(2,'0')}`,x,y+1);}
       }
       function updateChart(){
@@ -967,14 +1093,14 @@
         const d='M'+pts.join(' L');ui.line.setAttribute('d',d);ui.area.setAttribute('d',d+' L228,52 L0,52 Z');ui.record.textContent=`рекорд ${record.toFixed(1)} м`;
       }
       function showToast(text){clearTimeout(toastTimer);ui.toast.textContent=text;ui.toast.classList.add('show');toastTimer=setTimeout(()=>ui.toast.classList.remove('show'),1800);}
-      function frame(now){const dt=Math.min(.04,(now-last)/1000||0);last=now;update(dt);draw();saveClock+=dt;if(saveClock>=1){saveClock=0;saveExperiment();}requestAnimationFrame(frame);}
+      function frame(now){const dt=Math.min(.04,(now-last)/1000||0);last=now;update(dt);updateEffects(dt);draw();saveClock+=dt;if(saveClock>=1){saveClock=0;saveExperiment();}requestAnimationFrame(frame);}
 
       function saveExperiment(){
         if(awaitingResume)return false;
-        const state={version:2,traceSpace:'terrain-relative',savedAt:Date.now(),generation,elapsed,paused,phase:phase==='archive'?phaseBeforeArchive:phase,
+        const state={version:3,traceSpace:'terrain-relative',savedAt:Date.now(),generation,elapsed,paused,phase:phase==='archive'?phaseBeforeArchive:phase,
           cars,history,populationSize,mutationRate,terrainVersion:2,record,currentIndex,phaseTimer,cameraX,groundBase,
           runTrace,nextTraceAt,raceGhost,carryGhost,generationGhost,generationGhostGenome,generationGhostId,
-          breedingPlan,breedIndex,breedClock,champions,archiveLimit,seed:rng.seed,speed:+ui.speed.value};
+          breedingPlan,breedIndex,breedClock,champions,championHistory,phaseBeforeReport,finishReportSeen,archiveLimit,seed:rng.seed,speed:+ui.speed.value};
         try{localStorage.setItem(SAVE_KEY,JSON.stringify(state));$('saveStatus').textContent='Автосохранено';return true;}
         catch(error){$('saveStatus').textContent='Сохранение недоступно';return false;}
       }
@@ -982,11 +1108,13 @@
         const finite=Number.isFinite,genome=g=>g&&Object.entries(bounds).every(([k,[lo,hi]])=>finite(g[k])&&g[k]>=lo&&g[k]<=hi);
         const trace=t=>Array.isArray(t)&&t.length<=10000&&t.every((p,i)=>p&&['t','x','y','angle'].every(k=>finite(p[k]))&&p.t>=0&&(!i||p.t>=t[i-1].t)&&(!p.susp||(Array.isArray(p.susp)&&p.susp.length===3&&p.susp.every(finite))));
         const carId=id=>Number.isInteger(id)&&id>=1&&id<=24;
-        return s&&[1,2].includes(s.version)&&(s.version===1||s.traceSpace==='terrain-relative')&&s.terrainVersion===2&&Number.isInteger(s.generation)&&s.generation>=1&&
+        const champion=c=>c&&genome(c.g)&&carId(c.id)&&Number.isInteger(c.generation)&&c.generation>=1&&finite(c.meters)&&finite(c.bestX);
+        return s&&[1,2,3].includes(s.version)&&(s.version===1||s.traceSpace==='terrain-relative')&&s.terrainVersion===2&&Number.isInteger(s.generation)&&s.generation>=1&&
           Number.isInteger(s.populationSize)&&s.populationSize>=6&&s.populationSize<=24&&Array.isArray(s.cars)&&s.cars.length===s.populationSize&&
           s.cars.every(c=>c&&carId(c.id)&&genome(c.g)&&['x','y','vx','vy','angle','av','bestX','score','still','wheelDamage','frameDamage'].every(k=>finite(c[k]))&&Array.isArray(c.susp)&&c.susp.length===3&&c.susp.every(finite))&&
           Number.isInteger(s.currentIndex)&&s.currentIndex>=0&&s.currentIndex<s.cars.length&&finite(s.elapsed)&&s.elapsed>=0&&s.elapsed<=RUN_TIME+.1&&finite(s.phaseTimer)&&finite(s.seed)&&finite(s.groundBase)&&finite(s.record)&&finite(s.savedAt)&&finite(s.cameraX)&&finite(s.nextTraceAt)&&finite(s.mutationRate)&&s.mutationRate>=.02&&s.mutationRate<=.35&&
-          ['racing','between','results','breeding'].includes(s.phase)&&trace(s.runTrace)&&Array.isArray(s.history)&&s.history.every(finite)&&
+          ['racing','between','results','breeding','report'].includes(s.phase)&&(s.phase!=='report'||['racing','between','results','breeding'].includes(s.phaseBeforeReport))&&trace(s.runTrace)&&Array.isArray(s.history)&&s.history.every(finite)&&
+          (s.version<3||(Array.isArray(s.championHistory)&&s.championHistory.every((c,i)=>champion(c)&&c.generation<=s.generation&&(!i||c.generation>s.championHistory[i-1].generation))&&typeof s.finishReportSeen==='boolean'))&&
           Array.isArray(s.champions)&&s.champions.length<=10&&s.champions.every(c=>genome(c.g)&&carId(c.id)&&Number.isInteger(c.generation)&&c.generation>=1&&finite(c.meters)&&finite(c.bestX))&&Array.isArray(s.breedingPlan)&&s.breedingPlan.length<=s.populationSize&&s.breedingPlan.every(p=>genome(p.genome)&&['elite','child'].includes(p.type)&&Number.isInteger(p.mutations)&&p.mutations>=0&&Array.isArray(p.parents)&&p.parents.length===(p.type==='elite'?1:2)&&p.parents.every(c=>genome(c.g)&&carId(c.id)&&finite(c.bestX)))&&Number.isInteger(s.breedIndex)&&s.breedIndex>=0&&s.breedIndex<=s.breedingPlan.length&&finite(s.breedClock)&&[5,10].includes(s.archiveLimit)&&
           (!s.carryGhost||(genome(s.carryGhost.genome)&&trace(s.carryGhost.trace)&&finite(s.carryGhost.score)&&carId(s.carryGhost.id)&&Number.isInteger(s.carryGhost.generation)&&s.carryGhost.generation>=1&&(s.carryGhost.meters===undefined||finite(s.carryGhost.meters))))&&
           (!s.raceGhost||(genome(s.raceGhost.genome)&&trace(s.raceGhost.trace)))&&(!s.generationGhost||trace(s.generationGhost));
@@ -999,6 +1127,7 @@
       }
       function restoreExperiment(){
         const s=savedExperiment;if(!s)return;awaitingResume=false;closeOverlay($('resumeOverlay'));
+        closeOverlay($('evolutionOverlay'));
         if(s.version===1){
           const converted=new Set();[s.runTrace,s.raceGhost?.trace,s.carryGhost?.trace,s.generationGhost].forEach(trace=>{
             if(!trace||converted.has(trace))return;converted.add(trace);
@@ -1011,15 +1140,19 @@
         runTrace=s.runTrace;nextTraceAt=s.nextTraceAt;raceGhost=s.raceGhost;carryGhost=s.carryGhost;
         generationGhost=s.generationGhost;generationGhostGenome=s.generationGhostGenome;generationGhostId=s.generationGhostId;
         breedingPlan=s.breedingPlan;breedIndex=s.breedIndex;breedClock=s.breedClock;champions=s.champions;archiveLimit=s.archiveLimit;rng.seed=s.seed;
+        championHistory=s.version>=3? s.championHistory.map(c=>({...c,g:{...c.g}})):[...champions].reverse().map(c=>({...c,g:{...c.g}}));
+        phaseBeforeReport=s.phaseBeforeReport||'racing';finishReportSeen=!!s.finishReportSeen;resetRunEffects(true);
         const dy=groundBase-s.groundBase;cars.forEach(c=>c.y+=dy);
         // The replay always uses the all-time champion, including the first car of a restored generation.
         raceGhost=carryGhost?.trace?.length?{trace:carryGhost.trace,genome:carryGhost.genome,id:carryGhost.id,generation:carryGhost.generation}:null;
         ui.population.value=populationSize;ui.populationOut.textContent=populationSize;ui.mutation.value=Math.round(mutationRate*100);ui.mutationOut.textContent=`${Math.round(mutationRate*100)}%`;ui.speed.value=[1,2,4,8,16].includes(s.speed)?s.speed:8;
         ui.toggle.textContent=paused?'Продолжить':'Пауза';ui.statusDot.classList.toggle('paused',paused);ui.statusText.textContent=paused?'на паузе':`заезд #${String(activeCar().id).padStart(2,'0')}`;ui.next.disabled=phase!=='racing';
         cars.forEach(c=>c.color=genomeColor(c.g));ui.generation.textContent=String(generation).padStart(2,'0');ui.distance.textContent=meters(activeCar()).toFixed(1);ui.alive.textContent=`${currentIndex+1} / ${cars.length}`;ui.timer.textContent=`${Math.max(0,RUN_TIME-elapsed).toFixed(1)} с`;
-        if(phase==='results'){showResults(true);phaseTimer=s.phaseTimer;}
-        else if(phase==='breeding'){const count=s.breedIndex;beginBreeding(true);for(let i=0;i<count;i++)revealOffspring();phaseTimer=s.phaseTimer;breedClock=s.breedClock;}
-        else if(phase==='between')showOutcome(activeCar(),outcomeInfo(activeCar().outcome));
+        const savedPhase=phase,underlyingPhase=phase==='report'?phaseBeforeReport:phase;
+        if(underlyingPhase==='results'){showResults(true);phaseTimer=s.phaseTimer;}
+        else if(underlyingPhase==='breeding'){const count=s.breedIndex;beginBreeding(true);for(let i=0;i<count;i++)revealOffspring();phaseTimer=s.phaseTimer;breedClock=s.breedClock;}
+        else if(underlyingPhase==='between')showOutcome(activeCar(),outcomeInfo(activeCar().outcome));
+        if(savedPhase==='report'){phase='report';renderEvolutionReport();openOverlay($('evolutionOverlay'));ui.statusText.textContent='отчёт эволюции';}
         document.querySelectorAll('[data-limit]').forEach(b=>b.classList.toggle('active',+b.dataset.limit===archiveLimit));renderChampions();updateMiniBoard();updateChart();updateGenomeComparison(true);last=performance.now();saveExperiment();showToast('Эксперимент восстановлен');
       }
 
@@ -1028,12 +1161,13 @@
       ui.showBreeding.addEventListener('click',()=>beginBreeding());ui.startNext.addEventListener('click',launchNextGeneration);
       ui.champions.addEventListener('click',openChampions);ui.closeChampions.addEventListener('click',closeChampions);
       ui.expandChampions.addEventListener('click',openChampions);
+      $('openEvolutionReport').addEventListener('click',()=>openEvolutionReport());$('closeEvolutionReport').addEventListener('click',closeEvolutionReport);
       document.querySelectorAll('[data-limit]').forEach(button=>button.addEventListener('click',()=>{archiveLimit=+button.dataset.limit;document.querySelectorAll('[data-limit]').forEach(b=>b.classList.toggle('active',b===button));renderChampions();}));
       ui.population.addEventListener('input',()=>ui.populationOut.textContent=ui.population.value);
       ui.population.addEventListener('change',()=>{populationSize=+ui.population.value;resetAll();});
       ui.mutation.addEventListener('input',()=>{mutationRate=+ui.mutation.value/100;ui.mutationOut.textContent=ui.mutation.value+'%';});
       window.addEventListener('resize',resize);
-      window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();ui.toggle.click();}if(e.key.toLowerCase()==='n'&&phase==='racing')ui.next.click();});
+      window.addEventListener('keydown',e=>{if(e.key==='Escape'&&phase==='report')closeEvolutionReport();if(e.code==='Space'){e.preventDefault();ui.toggle.click();}if(e.key.toLowerCase()==='n'&&phase==='racing')ui.next.click();});
 
       const saveStrip=document.createElement('div');saveStrip.className='save-strip';saveStrip.innerHTML='<span id="saveStatus" aria-live="polite">Автосохранение включено</span><button class="save-button" id="saveNow">Сохранить</button><button class="save-button" id="exportSave" title="Скачать резервную копию эксперимента">↓ JSON</button><button class="save-button" id="importSave" title="Восстановить эксперимент из файла">↑ JSON</button><input id="saveFile" type="file" accept=".json,application/json" hidden>';document.querySelector('.controls').appendChild(saveStrip);
       $('saveNow').addEventListener('click',()=>showToast(saveExperiment()?'Эксперимент сохранён':'Не удалось сохранить в этом браузере'));
